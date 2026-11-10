@@ -13,8 +13,8 @@ from pathlib import PurePosixPath
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 SEVERITY_RANK = {s: i for i, s in enumerate(SEVERITIES)}
-NONCE_VAR = "VULNSCAN_NONCE"
-PROOF_PREFIX = "VULNSCAN-PROOF:"
+NONCE_VAR = "THREADSCAN_NONCE"
+PROOF_PREFIX = "THREADSCAN-PROOF:"
 
 MAX_SCRIPT_BYTES = 64_000
 MAX_FILES = 20
@@ -128,7 +128,7 @@ def safe_relpath(path: str) -> bool:
 
 def candidate_id(component: str, file: str, title: str) -> str:
     norm = re.sub(r"\s+", " ", title.strip().lower())
-    return "VS-" + hashlib.sha256(f"{component}|{file}|{norm}".encode()).hexdigest()[:10]
+    return "TS-" + hashlib.sha256(f"{component}|{file}|{norm}".encode()).hexdigest()[:10]
 
 
 def _s(raw: dict, key: str) -> str:

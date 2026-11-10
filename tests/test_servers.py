@@ -9,9 +9,9 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from vulnscan import dashboard
-from vulnscan.gateway import Stats, make_handler
-from vulnscan.status import StatusTracker, write_json
+from threadscan import dashboard
+from threadscan.gateway import Stats, make_handler
+from threadscan.status import StatusTracker, write_json
 
 
 def _serve(handler):
@@ -58,27 +58,26 @@ def runs(tmp_path):
     st.component("auth", state="running")
     st.phase("scanning")
     write_json(run / "components" / "auth-1" / "out" / "progress.json", {"turns": 4, "tool_calls": 9, "last": "Grep: password", "state": "running"})
-    write_json(run / "findings.json", [{"id": "VS-1", "title": "t", "severity": "high"}])
+    write_json(run / "findings.json", [{"id": "TS-1", "title": "t", "severity": "high"}])
     (run / "report.md").write_text("# report\n")
     (tmp_path / "secret.txt").write_text("outside runs")
     return d
 
 
 def test_dashboard_api(runs):
-    port_holder = {}
     srv = ThreadingHTTPServer(("127.0.0.1", 0), dashboard.make_handler(runs, 0))
     port = srv.server_address[1]
     srv.RequestHandlerClass = dashboard.make_handler(runs, port)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
         status, body = _req(port, "GET", "/")
-        assert status == 200 and b"vulnscan" in body
+        assert status == 200 and b"threadscan" in body
         lst = json.loads(_req(port, "GET", "/api/runs")[1])
         assert lst[0]["run_id"] == "20260101-000000-demo" and lst[0]["phase"] == "scanning"
         st = json.loads(_req(port, "GET", "/api/runs/20260101-000000-demo")[1])
         assert st["components"][0]["progress"]["tool_calls"] == 9  # live progress merged in
         f = json.loads(_req(port, "GET", "/api/runs/20260101-000000-demo/findings")[1])
-        assert f[0]["id"] == "VS-1"
+        assert f[0]["id"] == "TS-1"
         assert _req(port, "GET", "/api/runs/20260101-000000-demo/report")[1] == b"# report\n"
         # traversal and unknown runs
         assert _req(port, "GET", "/api/runs/..%2Fsecret.txt")[0] == 404
@@ -86,8 +85,22 @@ def test_dashboard_api(runs):
         assert _req(port, "GET", "/../secret.txt")[0] == 404
         # DNS-rebinding guard
         assert _req(port, "GET", "/api/runs", host="evil.example")[0] == 403
+        # self-hosted fonts and the mark, by exact name only
+        for path in dashboard.STATIC_FILES:
+            status, body = _req(port, "GET", path)
+            assert status == 200 and len(body) > 500, path
+        assert _req(port, "GET", "/static/fonts/../../dashboard.py")[0] == 404
+        assert _req(port, "GET", "/static/fonts/LICENSE-Inter.txt")[0] == 404
     finally:
         srv.shutdown()
+
+
+def test_dashboard_never_references_a_font_cdn():
+    # the SVG namespace is an identifier, not a request
+    html = dashboard.HTML_PATH.read_text(encoding="utf-8").replace("http://www.w3.org/2000/svg", "")
+    for host in ("fonts.googleapis", "fonts.gstatic", "cdn.", "unpkg", "jsdelivr", "http://", "https://"):
+        assert host not in html, host
+    assert "Thread<span>scan</span>" in html
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")

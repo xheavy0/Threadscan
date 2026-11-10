@@ -3,8 +3,8 @@ import json
 import pytest
 from helpers import ScriptedExecutor, candidate, clean, proof
 
-from vulnscan.report import Dropped, build_summary, finding_dict, render_markdown, write_outputs
-from vulnscan.verify import Policy, Verifier
+from threadscan.report import Dropped, build_summary, finding_dict, render_markdown, write_outputs
+from threadscan.verify import Policy, Verifier
 
 META = {"run_id": "r1", "project": "demo", "mode": "diff", "base": "HEAD~1", "commit": "abc123", "model": "claude-opus-5-5", "dry_run": False}
 
@@ -40,12 +40,12 @@ def test_markdown_report_contents():
     f = verified_finding()
     summary = build_summary(3, [comp_result(), comp_result("b", cost=0.5), comp_result("c", state="error", cost=None, tin=None, tout=None)], 4, [f], [Dropped("b", "not_reproduced", "x"), Dropped("b", "patch_did_not_fix", "y")], 10, 7, {"false_positive": 3}, None)
     md = render_markdown(META, [f], summary)
-    assert "# vulnscan report: demo" in md
+    assert "# threadscan report: demo" in md
     assert "diff scan since `HEAD~1`" in md
     assert "### [CRITICAL] Admin API reachable without a session" in md
     assert "`app/Login.java:1`" in md
     assert "CWE-306" in md
-    assert "```bash" in md and "VULNSCAN-PROOF:$VULNSCAN_NONCE" in md
+    assert "```bash" in md and "THREADSCAN-PROOF:$THREADSCAN_NONCE" in md
     assert "```diff" in md and "+class Login" in md
     assert "proof line printed" in md and "Patched (result: fixed)" in md
     assert "| Components scanned | 2 of 3 (1 failed) |" in md
@@ -72,7 +72,7 @@ def test_dry_run_report_says_so():
 
 
 def test_fence_survives_backticks_in_content():
-    f = verified_finding(reproducer={"script": "echo '```' ; echo $VULNSCAN_NONCE", "files": []})
+    f = verified_finding(reproducer={"script": "echo '```' ; echo $THREADSCAN_NONCE", "files": []})
     md = render_markdown(META, [f], build_summary(1, [comp_result()], 1, [f], [], 0, 0, {}, None))
     assert "````bash" in md
 
@@ -81,7 +81,7 @@ def test_write_outputs(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api03-DONOTLEAKDONOTLEAK")
     hi = verified_finding(title="high one", severity="high", description="leaks sk-ant-api03-DONOTLEAKDONOTLEAK")
     crit = verified_finding()
-    dropped = [Dropped("auth", "not_reproduced", "maybe", "VS-x")]
+    dropped = [Dropped("auth", "not_reproduced", "maybe", "TS-x")]
     summary = build_summary(1, [comp_result()], 3, [hi, crit], dropped, 0, 0, {}, {"forwarded": 10})
     report = write_outputs(tmp_path, META, [hi, crit], dropped, summary)
     findings = json.loads((tmp_path / "findings.json").read_text())
@@ -92,4 +92,4 @@ def test_write_outputs(tmp_path, monkeypatch):
     assert s["verified"] == 2 and s["dropped"] == 1 and s["meta"]["run_id"] == "r1" and s["by_severity"] == {"critical": 1, "high": 1}
     for p in tmp_path.rglob("*.*"):
         assert "DONOTLEAK" not in p.read_text(encoding="utf-8"), p
-    assert report.read_text().startswith("# vulnscan report")
+    assert report.read_text().startswith("# threadscan report")

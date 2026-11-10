@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<title id="title">Threadscan — TS</title>
+<defs>
+  <linearGradient id="ribbon" x1="16" y1="128" x2="496" y2="384" gradientUnits="userSpaceOnUse"><stop stop-color="#a6d84a"/><stop offset="0.48" stop-color="#84C21F"/><stop offset="1" stop-color="#5e9112"/></linearGradient>
+  <clipPath id="frame"><path d="M184 16H480Q496 16 496 32V240Q496 252 488 260L260 488Q252 496 240 496H32Q16 496 16 480V184Q16 176 24 168L168 24Q176 16 184 16Z"/></clipPath>
+</defs>
+<g clip-path="url(#frame)">
+  <path d="M184 16H480Q496 16 496 32V240Q496 252 488 260L260 488Q252 496 240 496H32Q16 496 16 480V184Q16 176 24 168L168 24Q176 16 184 16Z" fill="url(#ribbon)"/>
+  <path d="M16 184L176 16L288 200L72 280Z" fill="#a6d84a" opacity="0.48"/>
+  <path d="M176 16H496L360 152H256Z" fill="#84C21F" opacity="0.6"/>
+  <path d="M496 32V256L360 392V152Z" fill="#5e9112" opacity="0.34"/>
+  <path d="M16 496L72 440H304L260 488Q252 496 240 496Z" fill="#5e9112" opacity="0.36"/>
+  <path d="M220 440H304L260 488Q252 496 240 496Z" fill="#a6d84a" opacity="0.32"/>
+  <rect x="72" y="152" width="288" height="288" rx="18" fill="#090B10"/>
+  <g fill="#F5F6F8" fill-rule="evenodd"><path transform="translate(132 240)" d="M0 0H84V24H54V112H30V24H0Z"/>
+<path transform="translate(222 240)" d="M0 0H78V24H24V44H78V112H0V88H54V68H0Z"/></g>
+</g>
+</svg>

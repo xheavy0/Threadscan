@@ -1,6 +1,6 @@
 """Local, read-only dashboard: scan progress and verified findings.
 
-``vulnscan dashboard`` serves ``dashboard.html`` and a small JSON API over the runs
+``threadscan dashboard`` serves ``dashboard.html`` and a small JSON API over the runs
 directory. It binds to 127.0.0.1 only, checks the Host header (so a web page cannot
 reach it through DNS rebinding), serves nothing but files inside ``runs/<run-id>/``
 that it names itself, and never writes.
@@ -14,13 +14,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from vulnscan.redact import redact_obj
+from threadscan.redact import redact_obj
 
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$")
 HTML_PATH = Path(__file__).resolve().parent / "dashboard.html"
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+# The only static files served, by exact name: self-hosted fonts (no font CDN) and the mark.
+STATIC_FILES = {
+    "/static/threadscan.svg": ("threadscan.svg", "image/svg+xml"),
+    "/favicon.svg": ("threadscan.svg", "image/svg+xml"),
+    "/static/fonts/inter.woff2": ("fonts/inter-latin-wght-normal.woff2", "font/woff2"),
+    "/static/fonts/source-serif-4.woff2": ("fonts/source-serif-4-latin-wght-normal.woff2", "font/woff2"),
+    "/static/fonts/jetbrains-mono-400.woff2": ("fonts/jetbrains-mono-latin-400-normal.woff2", "font/woff2"),
+    "/static/fonts/jetbrains-mono-500.woff2": ("fonts/jetbrains-mono-latin-500-normal.woff2", "font/woff2"),
+}
 CSP = (
-    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-    "connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self'; "
+    "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 
 
@@ -74,17 +84,17 @@ def make_handler(runs_dir: Path, port: int):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
 
     class Handler(BaseHTTPRequestHandler):
-        server_version = "vulnscan-dashboard"
+        server_version = "threadscan-dashboard"
         sys_version = ""
 
         def log_message(self, fmt, *args):
             pass
 
-        def _send(self, code: int, body: bytes, ctype: str) -> None:
+        def _send(self, code: int, body: bytes, ctype: str, cache: str = "no-store") -> None:
             self.send_response(code)
             self.send_header("content-type", ctype)
             self.send_header("content-length", str(len(body)))
-            self.send_header("cache-control", "no-store")
+            self.send_header("cache-control", cache)
             self.send_header("x-content-type-options", "nosniff")
             self.send_header("referrer-policy", "no-referrer")
             self.send_header("content-security-policy", CSP)
@@ -100,6 +110,9 @@ def make_handler(runs_dir: Path, port: int):
             path = unquote(urlparse(self.path).path)
             if path in ("/", "/index.html"):
                 return self._send(200, HTML_PATH.read_bytes(), "text/html; charset=utf-8")
+            if path in STATIC_FILES:
+                name, ctype = STATIC_FILES[path]
+                return self._send(200, (STATIC_DIR / name).read_bytes(), ctype, "public, max-age=86400")
             if path == "/api/runs":
                 return self._json(list_runs(runs_dir))
             m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report))?$", path)
@@ -123,7 +136,7 @@ def serve(runs_dir: Path, port: int = 8765) -> None:
     runs_dir = runs_dir.resolve()
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runs_dir, port))
     server.daemon_threads = True
-    print(f"vulnscan dashboard: http://127.0.0.1:{port}/  (runs: {runs_dir}; Ctrl+C to stop)", flush=True)
+    print(f"threadscan dashboard: http://127.0.0.1:{port}/  (runs: {runs_dir}; Ctrl+C to stop)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

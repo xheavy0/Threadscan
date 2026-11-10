@@ -1,12 +1,12 @@
 import pytest
 from helpers import candidate, raw_candidate
 
-from vulnscan.candidates import CANDIDATE_SCHEMA, dedupe, safe_relpath, validate_candidate
+from threadscan.candidates import CANDIDATE_SCHEMA, dedupe, safe_relpath, validate_candidate
 
 
 def test_valid_candidate():
     c = candidate()
-    assert c.id.startswith("VS-") and c.severity == "critical" and c.line == 1
+    assert c.id.startswith("TS-") and c.severity == "critical" and c.line == 1
     assert c.files[0].path == "app/LoginTest.java"
     assert c.patch.endswith("\n")
 
@@ -29,10 +29,10 @@ def test_id_is_stable_and_depends_on_component_file_title():
         ({"line": True}, "line"),
         ({"reproducer": None}, "reproducer"),
         ({"reproducer": {"script": "", "files": []}}, "empty"),
-        ({"reproducer": {"script": "echo proof", "files": []}}, "VULNSCAN_NONCE"),
-        ({"reproducer": {"script": "echo $VULNSCAN_NONCE", "files": [{"path": "../../etc/x", "content": ""}]}}, "unsafe"),
-        ({"reproducer": {"script": "echo $VULNSCAN_NONCE", "files": [{"path": "C:/x", "content": ""}]}}, "unsafe"),
-        ({"reproducer": {"script": "echo $VULNSCAN_NONCE", "files": [{"path": ".git/hooks/pre-commit", "content": ""}]}}, "unsafe"),
+        ({"reproducer": {"script": "echo proof", "files": []}}, "THREADSCAN_NONCE"),
+        ({"reproducer": {"script": "echo $THREADSCAN_NONCE", "files": [{"path": "../../etc/x", "content": ""}]}}, "unsafe"),
+        ({"reproducer": {"script": "echo $THREADSCAN_NONCE", "files": [{"path": "C:/x", "content": ""}]}}, "unsafe"),
+        ({"reproducer": {"script": "echo $THREADSCAN_NONCE", "files": [{"path": ".git/hooks/pre-commit", "content": ""}]}}, "unsafe"),
         ({"patch": "x" * 300_000}, "patch too large"),
     ],
 )

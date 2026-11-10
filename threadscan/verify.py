@@ -5,8 +5,8 @@ host starts a *fresh* container from the scan image with no network at all and r
 the reproducer itself:
 
 1. **Unpatched run.** The gate generates a random nonce and passes it as
-   ``$VULNSCAN_NONCE``. The reproducer must exit 0 and print the line
-   ``VULNSCAN-PROOF:<nonce>`` if, and only if, it demonstrated the issue. A new
+   ``$THREADSCAN_NONCE``. The reproducer must exit 0 and print the line
+   ``THREADSCAN-PROOF:<nonce>`` if, and only if, it demonstrated the issue. A new
    nonce per run means output copied from the agent's session cannot pass.
 2. **Patched run** (differential check). A second fresh container applies the
    candidate's patch, then runs the same reproducer with a different nonce. It must
@@ -27,11 +27,11 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from typing import Callable, Protocol
 
-from vulnscan.candidates import PROOF_PREFIX, Candidate
-from vulnscan.redact import redact
+from threadscan.candidates import PROOF_PREFIX, Candidate
+from threadscan.redact import redact
 
 PATCH_FAILED_EXIT = 97
-PATCH_FAILED_MARKER = "VULNSCAN-PATCH-FAILED"
+PATCH_FAILED_MARKER = "THREADSCAN-PATCH-FAILED"
 
 # Drop reasons, in the order the gate can reach them.
 DROP_REASONS = {

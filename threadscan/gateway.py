@@ -102,7 +102,7 @@ def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST,
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "vulnscan-gw"
+        server_version = "threadscan-gw"
         sys_version = ""
 
         def log_message(self, fmt, *args):  # one line per request, no bodies, no headers
@@ -110,7 +110,7 @@ def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST,
 
         def _deny(self, code: int, msg: str) -> None:
             stats.record("denied", code)
-            body = json.dumps({"type": "error", "error": {"type": "vulnscan_gateway", "message": msg}}).encode()
+            body = json.dumps({"type": "error", "error": {"type": "threadscan_gateway", "message": msg}}).encode()
             self.send_response(code)
             self.send_header("content-type", "application/json")
             self.send_header("content-length", str(len(body)))
@@ -180,7 +180,7 @@ def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST,
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(description="vulnscan Anthropic API gateway")
+    ap = argparse.ArgumentParser(description="threadscan Anthropic API gateway")
     ap.add_argument("--listen", default="0.0.0.0:8080")
     ap.add_argument("--stats", default=None)
     ap.add_argument("--max-requests", type=int, default=2000)
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
     stats.record("start")
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port)), make_handler(key, stats))
     server.daemon_threads = True
-    print(f"vulnscan gateway listening on {args.listen}, upstream https://{UPSTREAM_HOST}", flush=True)
+    print(f"threadscan gateway listening on {args.listen}, upstream https://{UPSTREAM_HOST}", flush=True)
     server.serve_forever()
     return 0
 

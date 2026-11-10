@@ -16,7 +16,7 @@ import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from vulnscan.config import ComponentsConfig
+from threadscan.config import ComponentsConfig
 
 
 @lru_cache(maxsize=4096)

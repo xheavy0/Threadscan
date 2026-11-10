@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from vulnscan import docker_ops as dk
-from vulnscan.agent_runner import DENIED, TOOLS, build_options, extract_json
-from vulnscan.gateway import is_allowed, upstream_headers
+from threadscan import docker_ops as dk
+from threadscan.agent_runner import DENIED, TOOLS, build_options, extract_json
+from threadscan.gateway import is_allowed, upstream_headers
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ def test_gateway_refuses_everything_else(method, target):
 
 
 def test_gateway_replaces_client_credentials():
-    h = upstream_headers([("X-Api-Key", "placeholder"), ("Authorization", "Bearer stolen"), ("Host", "vulnscan-gw"), ("anthropic-version", "2023-06-01"), ("Cookie", "a=b"), ("Content-Length", "10")], "real-key")
+    h = upstream_headers([("X-Api-Key", "placeholder"), ("Authorization", "Bearer stolen"), ("Host", "threadscan-gw"), ("anthropic-version", "2023-06-01"), ("Cookie", "a=b"), ("Content-Length", "10")], "real-key")
     assert h == {"anthropic-version": "2023-06-01", "x-api-key": "real-key"}
 
 
@@ -58,7 +58,7 @@ def test_verify_container_has_no_network(tmp_path):
     args = dk.verify_run_args("n", "img", tmp_path, "patched", "abc", "/src", "4g", 2.0)
     assert args[args.index("--network") + 1] == "none"
     assert "ANTHROPIC" not in " ".join(args)
-    assert "VULNSCAN_NONCE=abc" in args and "--cap-drop" in args
+    assert "THREADSCAN_NONCE=abc" in args and "--cap-drop" in args
 
 
 def test_gateway_gets_key_by_name_only(tmp_path, monkeypatch):

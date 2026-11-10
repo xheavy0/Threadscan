@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import json
 
-from vulnscan.candidates import CANDIDATE_SCHEMA, NONCE_VAR, PROOF_PREFIX
-from vulnscan.components import Component
-from vulnscan.config import ProjectConfig
-from vulnscan.seeds import Seed
+from threadscan.candidates import CANDIDATE_SCHEMA, NONCE_VAR, PROOF_PREFIX
+from threadscan.components import Component
+from threadscan.config import ProjectConfig
+from threadscan.seeds import Seed
 
 MAX_FILE_LIST = 400
 

@@ -1,6 +1,8 @@
-# vulnscan
+# Threadscan
 
-A standalone AI vulnerability scanner for private code. It is modelled on the shape of
+<img src="threadscan/static/threadscan.svg" width="72" height="72" alt="Threadscan mark">
+
+Part of the Thread ecosystem. A standalone AI vulnerability scanner for private code. It is modelled on the shape of
 Anthropic's public [OSS Scanner](https://github.com/anthropics/oss-scanner) (a target
 config of `project.yaml` + `Dockerfile` + `threat_model.md`; build online, analyse
 offline; report with a reproducer and a proposed patch), but it runs on your own machine,
@@ -58,15 +60,15 @@ export ANTHROPIC_API_KEY="<key>"          # bash
 ## Usage
 
 ```bash
-vulnscan validate targets/aegis                         # check the config
-vulnscan components targets/aegis                       # what diff mode would scan
-vulnscan components targets/aegis --full                # all components
-vulnscan scan targets/aegis --dry-run --max-components 1   # plan only: no build, no API calls
-vulnscan scan targets/aegis --max-components 1 --dashboard # real scan of one component, with dashboard
-vulnscan scan targets/aegis --since origin/main         # diff mode against another base
-vulnscan scan targets/aegis --full --concurrency 2      # full scan (expensive)
-vulnscan scan targets/aegis --seed codeql=codeql.sarif --seed osv=osv.json
-vulnscan dashboard                                      # http://127.0.0.1:8765/
+threadscan validate targets/aegis                         # check the config
+threadscan components targets/aegis                       # what diff mode would scan
+threadscan components targets/aegis --full                # all components
+threadscan scan targets/aegis --dry-run --max-components 1   # plan only: no build, no API calls
+threadscan scan targets/aegis --max-components 1 --dashboard # real scan of one component, with dashboard
+threadscan scan targets/aegis --since origin/main         # diff mode against another base
+threadscan scan targets/aegis --full --concurrency 2      # full scan (expensive)
+threadscan scan targets/aegis --seed codeql=codeql.sarif --seed osv=osv.json
+threadscan dashboard                                      # http://127.0.0.1:8765/
 ```
 
 Useful flags: `--only NAME` (repeatable) scans named components; `--repo PATH|URL`
@@ -75,30 +77,34 @@ is gitignored).
 
 ### Dashboard
 
-`vulnscan dashboard` (or `scan --dashboard`) serves a read-only page on
+`threadscan dashboard` (or `scan --dashboard`) serves a read-only page on
 `http://127.0.0.1:8765/`: runs in the sidebar; for the selected run the phase
 (plan, build, scan, verify, report), per-component state with live agent activity
 (turns, tool calls, last action), the verification queue, counts, tokens and cost, and the
 verified findings with severity filters, evidence, reproducer and a coloured patch. It
-refreshes every 2 s while a run is live. It follows the Claude app's look (ivory and
-charcoal surfaces, terracotta accent, serif headings) and the system light/dark setting.
+refreshes every 2 s while a run is live. It uses the Thread ecosystem's Trellis look
+(as in Threadflow and Threadmap): ivory app with an always-dark sidebar, terracotta
+brand, colour for status only, Inter / Source Serif 4 / JetBrains Mono. The fonts are
+self-hosted under `threadscan/static/fonts/` (SIL OFL), so the page works offline and never
+calls a font CDN. Light and dark themes follow the system and can be toggled in the
+sidebar. Mark, accent and type choices are in [docs/branding.md](docs/branding.md).
 
 ## How it works
 
 ```
-host (vulnscan)                                   Docker
+host (threadscan)                                   Docker
 ───────────────                                   ──────
 plan: split components, pick diff set, seeds
-build: docker build target  ───────────────────▶  vulnscan/<name>-target   (network on)
-       docker build overlay ───────────────────▶  vulnscan/<name>-scan     (+ Python, Agent SDK, driver)
+build: docker build target  ───────────────────▶  threadscan/<name>-target   (network on)
+       docker build overlay ───────────────────▶  threadscan/<name>-scan     (+ Python, Agent SDK, driver)
 scan:  N components, `concurrency` at a time
        ┌──────────────────────── internal network (no route out) ─────────┐
        │ scan container: agent_runner.py ── HTTP ──▶ gateway ──TLS──▶ api.anthropic.com
        │   tools: Read, Grep, Glob, Bash           (holds the key; egress network)
        └──────────────────────────────────────────────────────────────────┘
 verify: per candidate, fresh container, --network none
-        run 1: reproducer on unpatched code  → must print VULNSCAN-PROOF:<nonce1>
-        run 2: patch applied, same reproducer → must exit 0 without VULNSCAN-PROOF:<nonce2>
+        run 1: reproducer on unpatched code  → must print THREADSCAN-PROOF:<nonce1>
+        run 2: patch applied, same reproducer → must exit 0 without THREADSCAN-PROOF:<nonce2>
 report: findings/*.json, findings.json, report.md, summary.json, dropped.json
 ```
 
@@ -125,7 +131,7 @@ threat model, CWE, a bash reproducer (plus optional files, e.g. a test class) an
 unified diff. The gate then, independently of anything the agent says:
 
 1. writes the files into a fresh container (`--network none`) and runs the script with a
-   random `VULNSCAN_NONCE`. It must exit 0 and print `VULNSCAN-PROOF:<nonce>` on its own line;
+   random `THREADSCAN_NONCE`. It must exit 0 and print `THREADSCAN-PROOF:<nonce>` on its own line;
 2. in another fresh container applies the patch (`git apply`, falling back to `patch -p1`)
    and runs the script with a new nonce. It must exit 0 and **not** print the proof.
 
@@ -204,8 +210,9 @@ What the scanner protects, and how:
   dashboard passes a redactor (the live API key value, `sk-ant-`, GitHub, AWS, Slack tokens,
   private keys). gitleaks seeds are loaded without their `Secret`/`Match` fields.
 - **The dashboard is local and read-only.** It binds to 127.0.0.1, checks the `Host` header
-  (DNS rebinding), serves only files it names inside `runs/<run-id>/`, sends a strict CSP and
-  renders all data as text.
+  (DNS rebinding), serves only files it names inside `runs/<run-id>/` plus a fixed list of
+  its own fonts and mark, loads nothing from other hosts, sends a strict CSP and renders all
+  data as text.
 - **Reports stay private.** `runs/` and `targets/*/seeds/` are gitignored.
 
 Residual risks to keep in mind:
@@ -243,7 +250,7 @@ Residual risks to keep in mind:
 
 Copy `targets/aegis/` as a template: point `repo` at the checkout, write a Dockerfile that
 leaves the source and an offline-ready build at `workdir`, describe trust boundaries and
-severity rules in `threat_model.md`, then `vulnscan validate` and `vulnscan components`.
+severity rules in `threat_model.md`, then `threadscan validate` and `threadscan components`.
 
 ## Development
 

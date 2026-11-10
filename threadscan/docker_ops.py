@@ -23,14 +23,14 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-GATEWAY_ALIAS = "vulnscan-gw"
+GATEWAY_ALIAS = "threadscan-gw"
 GATEWAY_PORT = 8080
 PLACEHOLDER_KEY = "sk-placeholder-the-gateway-injects-the-real-key"
-IN_DIR = "/vulnscan/in"
-OUT_DIR = "/vulnscan/out"
-AGENT_PY = "/opt/vulnscan/venv/bin/python"
-AGENT_RUNNER = "/opt/vulnscan/agent_runner.py"
-VERIFY_DRIVER = "/opt/vulnscan/verify_driver.sh"
+IN_DIR = "/threadscan/in"
+OUT_DIR = "/threadscan/out"
+AGENT_PY = "/opt/threadscan/venv/bin/python"
+AGENT_RUNNER = "/opt/threadscan/agent_runner.py"
+VERIFY_DRIVER = "/opt/threadscan/verify_driver.sh"
 
 HARDENING = ["--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
 # Claude Code: no telemetry, no auto-update, no error reporting; only the API calls.
@@ -97,7 +97,7 @@ def verify_run_args(
     return [
         "docker", "run", "--rm", "--name", name, "--network", "none",
         *HARDENING, "--pids-limit", "2048", "--memory", memory, "--cpus", str(cpus),
-        "-e", f"VULNSCAN_NONCE={nonce}", "-e", f"VULNSCAN_MODE={mode}", "-e", f"VULNSCAN_WORKDIR={workdir}",
+        "-e", f"THREADSCAN_NONCE={nonce}", "-e", f"THREADSCAN_MODE={mode}", "-e", f"THREADSCAN_WORKDIR={workdir}",
         *_mount(cand_dir, IN_DIR, True),
         "--entrypoint", "/bin/sh",
         image, VERIFY_DRIVER,

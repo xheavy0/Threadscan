@@ -8,7 +8,7 @@ import threading
 import time
 from pathlib import Path
 
-from vulnscan.redact import redact_obj
+from threadscan.redact import redact_obj
 
 
 def write_json(path: Path, obj) -> None:

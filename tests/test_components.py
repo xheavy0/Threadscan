@@ -1,6 +1,6 @@
-from vulnscan.components import glob_match, select_components, slugify, split_components
-from vulnscan.config import AutoSplit, ComponentsConfig, DEFAULT_EXCLUDES, ExplicitComponent
-from vulnscan.repo import changed_files, list_files
+from threadscan.components import glob_match, select_components, slugify, split_components
+from threadscan.config import AutoSplit, ComponentsConfig, DEFAULT_EXCLUDES, ExplicitComponent
+from threadscan.repo import changed_files, list_files
 
 FILES = [
     "backend/src/main/java/com/x/App.java",

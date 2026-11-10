@@ -12,9 +12,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from vulnscan.candidates import SEVERITY_RANK, Candidate
-from vulnscan.status import write_json
-from vulnscan.verify import DROP_REASONS, Verdict
+from threadscan.candidates import SEVERITY_RANK, Candidate
+from threadscan.status import write_json
+from threadscan.verify import DROP_REASONS, Verdict
 
 
 @dataclass
@@ -86,7 +86,7 @@ def _run_evidence(label: str, ev: dict | None) -> list[str]:
 
 
 def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
-    out = [f"# vulnscan report: {meta['project']}", ""]
+    out = [f"# threadscan report: {meta['project']}", ""]
     mode = "full scan" if meta["mode"] == "full" else f"diff scan since `{meta.get('base')}`"
     out += [
         f"- Run: `{meta['run_id']}`",
@@ -195,7 +195,7 @@ def write_outputs(run_dir: Path, meta: dict, findings: list[dict], dropped: list
     write_json(run_dir / "dropped.json", [d.to_dict() for d in dropped])
     write_json(run_dir / "summary.json", {"meta": meta, **summary})
     report = run_dir / "report.md"
-    from vulnscan.redact import redact
+    from threadscan.redact import redact
 
     report.write_text(redact(render_markdown(meta, findings, summary)), encoding="utf-8")
     return report

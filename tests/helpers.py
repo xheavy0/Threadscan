@@ -1,5 +1,5 @@
-from vulnscan.candidates import validate_candidate
-from vulnscan.verify import RunResult
+from threadscan.candidates import validate_candidate
+from threadscan.verify import RunResult
 
 PATCH = """--- a/app/Login.java
 +++ b/app/Login.java
@@ -10,7 +10,7 @@ PATCH = """--- a/app/Login.java
 
 SCRIPT = """set -e
 out=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/api/admin)
-if [ "$out" = 200 ]; then echo "VULNSCAN-PROOF:$VULNSCAN_NONCE"; fi
+if [ "$out" = 200 ]; then echo "THREADSCAN-PROOF:$THREADSCAN_NONCE"; fi
 """
 
 
@@ -40,7 +40,7 @@ def candidate(component="auth", **over):
 
 
 def proof(nonce: str, exit_code: int = 0, extra: str = "") -> RunResult:
-    return RunResult(exit_code, f"building...\n{extra}VULNSCAN-PROOF:{nonce}\n", "", 1.0)
+    return RunResult(exit_code, f"building...\n{extra}THREADSCAN-PROOF:{nonce}\n", "", 1.0)
 
 
 def clean(exit_code: int = 0, out: str = "tests passed\n") -> RunResult:

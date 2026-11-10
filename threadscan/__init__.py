@@ -1,4 +1,4 @@
-"""vulnscan: a standalone AI vulnerability scanner.
+"""threadscan: a standalone AI vulnerability scanner.
 
 Host side (this package, PyYAML only): parse the target config, split the target
 into components, build images, run one sandboxed agent per component, re-run every

@@ -16,7 +16,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from vulnscan.components import Component
+from threadscan.components import Component
 
 
 @dataclass

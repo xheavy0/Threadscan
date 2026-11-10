@@ -1,6 +1,6 @@
 """Runs INSIDE the scan container: one headless Claude agent for one component.
 
-Usage: python agent_runner.py /vulnscan/in/task.json /vulnscan/out
+Usage: python agent_runner.py /threadscan/in/task.json /threadscan/out
 
 Writes ``progress.json`` while it works (the dashboard reads it), ``transcript.jsonl``
 (text and tool calls, for review) and finally ``candidates.json``. This file must

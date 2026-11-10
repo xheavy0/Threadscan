@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # Scan overlay: adds the agent runtime on top of the TARGET's own image, so the agent
-# sees exactly the environment the target was built in. Built by `vulnscan scan` with
+# sees exactly the environment the target was built in. Built by `threadscan scan` with
 # network on (like the target build); everything after this runs offline.
 #
 #   BASE_IMAGE   the image built from targets/<name>/Dockerfile
@@ -29,11 +29,11 @@ RUN set -eux; \
     fi; \
     python3 -c 'import sys; assert sys.version_info >= (3, 10), "the Agent SDK needs Python 3.10+"'
 
-RUN python3 -m venv /opt/vulnscan/venv \
-    && /opt/vulnscan/venv/bin/pip install --no-cache-dir "${AGENT_SDK_SPEC}" \
-    && /opt/vulnscan/venv/bin/python -c "import claude_agent_sdk; print('claude-agent-sdk', getattr(claude_agent_sdk, '__version__', '?'))"
+RUN python3 -m venv /opt/threadscan/venv \
+    && /opt/threadscan/venv/bin/pip install --no-cache-dir "${AGENT_SDK_SPEC}" \
+    && /opt/threadscan/venv/bin/python -c "import claude_agent_sdk; print('claude-agent-sdk', getattr(claude_agent_sdk, '__version__', '?'))"
 
-COPY agent_runner.py verify_driver.sh /opt/vulnscan/
-RUN chmod 0755 /opt/vulnscan /opt/vulnscan/verify_driver.sh && chmod 0644 /opt/vulnscan/agent_runner.py
+COPY agent_runner.py verify_driver.sh /opt/threadscan/
+RUN chmod 0755 /opt/threadscan /opt/threadscan/verify_driver.sh && chmod 0644 /opt/threadscan/agent_runner.py
 
 USER ${TARGET_USER}

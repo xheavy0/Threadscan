@@ -3,7 +3,7 @@
 import pytest
 from helpers import ScriptedExecutor, candidate, clean, proof
 
-from vulnscan.verify import (
+from threadscan.verify import (
     PATCH_FAILED_EXIT,
     PATCH_FAILED_MARKER,
     Policy,
@@ -25,11 +25,11 @@ def honest(cand, mode, nonce):
 
 
 def test_proof_line_must_match_this_runs_nonce_exactly():
-    assert has_proof("x\nVULNSCAN-PROOF:abc\n", "abc")
-    assert has_proof("  VULNSCAN-PROOF:abc  \r\n", "abc")
-    assert not has_proof("VULNSCAN-PROOF:abc", "abd")  # output copied from another run
-    assert not has_proof("echo VULNSCAN-PROOF:abc", "abc")  # not on its own line
-    assert not has_proof("VULNSCAN-PROOF:abcdef", "abc")
+    assert has_proof("x\nTHREADSCAN-PROOF:abc\n", "abc")
+    assert has_proof("  THREADSCAN-PROOF:abc  \r\n", "abc")
+    assert not has_proof("THREADSCAN-PROOF:abc", "abd")  # output copied from another run
+    assert not has_proof("echo THREADSCAN-PROOF:abc", "abc")  # not on its own line
+    assert not has_proof("THREADSCAN-PROOF:abcdef", "abc")
     assert not has_proof("", "abc")
 
 
@@ -125,7 +125,7 @@ def test_evidence_is_redacted_and_truncated(monkeypatch):
 
     def beh(c, m, n):
         if m == "unpatched":
-            return RunResult(0, "x" * 20000 + "\nkey=sk-ant-api03-SECRETSECRETSECRET\nVULNSCAN-PROOF:" + n + "\n", "", 1)
+            return RunResult(0, "x" * 20000 + "\nkey=sk-ant-api03-SECRETSECRETSECRET\nTHREADSCAN-PROOF:" + n + "\n", "", 1)
         return clean()
 
     v = Verifier(ScriptedExecutor(beh), STRICT).verify_one(candidate())

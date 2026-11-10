@@ -11,16 +11,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from vulnscan import docker_ops as dk
-from vulnscan.candidates import Candidate, dedupe, validate_candidate
-from vulnscan.components import Component, select_components, split_components
-from vulnscan.config import ProjectConfig, SeedSpec
-from vulnscan.prompts import build_task
-from vulnscan.repo import changed_files, diff_text, head_commit, list_files, read_repo_file, resolve_repo
-from vulnscan.report import Dropped, build_summary, finding_dict, write_outputs
-from vulnscan.seeds import Seed, assign_seeds, load_seed_file
-from vulnscan.status import StatusTracker, write_json
-from vulnscan.verify import Executor, Policy, RunResult, Verifier
+from threadscan import docker_ops as dk
+from threadscan.candidates import Candidate, dedupe, validate_candidate
+from threadscan.components import Component, select_components, split_components
+from threadscan.config import ProjectConfig, SeedSpec
+from threadscan.prompts import build_task
+from threadscan.repo import changed_files, diff_text, head_commit, list_files, read_repo_file, resolve_repo
+from threadscan.report import Dropped, build_summary, finding_dict, write_outputs
+from threadscan.seeds import Seed, assign_seeds, load_seed_file
+from threadscan.status import StatusTracker, write_json
+from threadscan.verify import Executor, Policy, RunResult, Verifier
 
 PKG_DIR = Path(__file__).resolve().parent
 DOCKER_DIR = PKG_DIR.parent / "docker"
@@ -77,7 +77,7 @@ class DockerExecutor:
         d = self._prepare(c) if mode == "unpatched" else self.run_dir / "verify" / c.id / "in"
         v = self.cfg.verification
         timeout = min(c.timeout_seconds or v.timeout_seconds, v.timeout_seconds)
-        name = f"vulnscan-{self.run_id}-{c.id.lower()}-{mode}"[:120]
+        name = f"threadscan-{self.run_id}-{c.id.lower()}-{mode}"[:120]
         args = dk.verify_run_args(name, self.image, d, mode, nonce, self.cfg.workdir, v.memory, v.cpus)
         p = self.docker.call(args, timeout=timeout + 60, kill_name=name, log=self.run_dir / "verify" / c.id / f"{mode}.log")
         infra = None
@@ -91,11 +91,11 @@ class DockerBackend:
         self.cfg, self.repo, self.run_id = cfg, repo, run_id
         self.docker = dk.Docker()
         self.agent_sdk_spec = agent_sdk_spec
-        self.target_image = f"vulnscan/{cfg.name}-target:latest"
-        self.scan_image = f"vulnscan/{cfg.name}-scan:latest"
-        self.internal_net = f"vulnscan-{run_id}-scan"
-        self.egress_net = f"vulnscan-{run_id}-egress"
-        self.gateway = f"vulnscan-{run_id}-gw"
+        self.target_image = f"threadscan/{cfg.name}-target:latest"
+        self.scan_image = f"threadscan/{cfg.name}-scan:latest"
+        self.internal_net = f"threadscan-{run_id}-scan"
+        self.egress_net = f"threadscan-{run_id}-egress"
+        self.gateway = f"threadscan-{run_id}-gw"
         self.run_dir: Path | None = None
         self.containers: list[str] = []
         self.networks: list[str] = []
@@ -132,7 +132,7 @@ class DockerBackend:
     def scan_component(self, comp: Component, task_dir: Path, out_dir: Path) -> None:
         dk.make_writable(out_dir)
         s = self.cfg.scan
-        name = f"vulnscan-{self.run_id}-{comp.slug}"[:120]
+        name = f"threadscan-{self.run_id}-{comp.slug}"[:120]
         args = dk.scan_run_args(name, self.internal_net, self.scan_image, task_dir, out_dir, s.memory, s.cpus, s.pids_limit)
         p = self.docker.call(args, timeout=s.timeout_minutes * 60, kill_name=name, log=out_dir.parent / "container.log")
         if p.timed_out:
@@ -160,19 +160,19 @@ class DockerBackend:
 
 def _plan_commands(cfg: ProjectConfig, repo: Path, run_dir: Path, run_id: str, comps: list[Component]) -> dict:
     """The exact docker commands a real run would execute (secrets are never in them)."""
-    target, scan = f"vulnscan/{cfg.name}-target:latest", f"vulnscan/{cfg.name}-scan:latest"
-    net = f"vulnscan-{run_id}-scan"
+    target, scan = f"threadscan/{cfg.name}-target:latest", f"threadscan/{cfg.name}-scan:latest"
+    net = f"threadscan-{run_id}-scan"
     s, v = cfg.scan, cfg.verification
     return {
         "build_target": dk.build_args(cfg.dockerfile, repo, target),
         "build_overlay": dk.build_args(DOCKER_DIR / "overlay.Dockerfile", run_dir / "overlay-context", scan, {"BASE_IMAGE": target, "TARGET_USER": "<from image config>", "AGENT_SDK_SPEC": "claude-agent-sdk"}),
-        "networks": [["docker", "network", "create", "--driver", "bridge", "--internal", net], ["docker", "network", "create", "--driver", "bridge", f"vulnscan-{run_id}-egress"]],
-        "gateway": dk.gateway_run_args(f"vulnscan-{run_id}-gw", f"vulnscan-{run_id}-egress", cfg.gateway_image, PKG_DIR / "gateway.py", run_dir / "gateway", s.max_requests),
+        "networks": [["docker", "network", "create", "--driver", "bridge", "--internal", net], ["docker", "network", "create", "--driver", "bridge", f"threadscan-{run_id}-egress"]],
+        "gateway": dk.gateway_run_args(f"threadscan-{run_id}-gw", f"threadscan-{run_id}-egress", cfg.gateway_image, PKG_DIR / "gateway.py", run_dir / "gateway", s.max_requests),
         "scan": [
-            dk.scan_run_args(f"vulnscan-{run_id}-{c.slug}", net, scan, run_dir / "components" / c.slug, run_dir / "components" / c.slug / "out", s.memory, s.cpus, s.pids_limit)
+            dk.scan_run_args(f"threadscan-{run_id}-{c.slug}", net, scan, run_dir / "components" / c.slug, run_dir / "components" / c.slug / "out", s.memory, s.cpus, s.pids_limit)
             for c in comps
         ],
-        "verify_template": dk.verify_run_args(f"vulnscan-{run_id}-<id>-<mode>", scan, run_dir / "verify" / "<id>" / "in", "<unpatched|patched>", "<random nonce>", cfg.workdir, v.memory, v.cpus),
+        "verify_template": dk.verify_run_args(f"threadscan-{run_id}-<id>-<mode>", scan, run_dir / "verify" / "<id>" / "in", "<unpatched|patched>", "<random nonce>", cfg.workdir, v.memory, v.cpus),
     }
 
 

@@ -1,4 +1,4 @@
-"""Command line: ``vulnscan validate | components | scan | dashboard``."""
+"""Command line: ``threadscan validate | components | scan | dashboard``."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 import threading
 from pathlib import Path
 
-from vulnscan.config import SEED_TOOLS, ConfigError, SeedSpec, load_project
+from threadscan.config import SEED_TOOLS, ConfigError, SeedSpec, load_project
 
 
 def _seed_arg(value: str) -> SeedSpec:
@@ -46,8 +46,8 @@ def cmd_validate(a) -> int:
 
 
 def cmd_components(a) -> int:
-    from vulnscan.components import select_components, split_components
-    from vulnscan.repo import changed_files, list_files, resolve_repo
+    from threadscan.components import select_components, split_components
+    from threadscan.repo import changed_files, list_files, resolve_repo
 
     cfg = load_project(a.target, a.repo)
     repo = resolve_repo(cfg, Path(a.cache_dir).resolve(), offline=a.offline)
@@ -62,7 +62,7 @@ def cmd_components(a) -> int:
 
 
 def cmd_scan(a) -> int:
-    from vulnscan.orchestrator import ScanOptions, run_scan
+    from threadscan.orchestrator import ScanOptions, run_scan
 
     cfg = load_project(a.target, a.repo)
     opts = ScanOptions(
@@ -78,7 +78,7 @@ def cmd_scan(a) -> int:
         offline=a.offline,
     )
     if a.dashboard:
-        from vulnscan.dashboard import serve
+        from threadscan.dashboard import serve
 
         threading.Thread(target=serve, args=(Path(a.runs_dir), a.port), daemon=True).start()
     run_dir = run_scan(cfg, opts)
@@ -94,14 +94,14 @@ def cmd_scan(a) -> int:
 
 
 def cmd_dashboard(a) -> int:
-    from vulnscan.dashboard import serve
+    from threadscan.dashboard import serve
 
     serve(Path(a.runs_dir), a.port)
     return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="vulnscan", description="AI vulnerability scanner with a verification gate")
+    ap = argparse.ArgumentParser(prog="threadscan", description="AI vulnerability scanner with a verification gate")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("validate", help="check a target config")

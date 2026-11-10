@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from helpers import PATCH, clean, proof, raw_candidate
 
-from vulnscan.config import load_project
-from vulnscan.orchestrator import ScanOptions, run_scan
-from vulnscan.status import write_json
+from threadscan.config import load_project
+from threadscan.orchestrator import ScanOptions, run_scan
+from threadscan.status import write_json
 
 
 @pytest.fixture
@@ -84,8 +84,8 @@ def test_full_pipeline(cfg, tmp_path):
         auth: {
             "findings": [
                 raw_candidate(),  # real
-                raw_candidate(title="Fabricated", line=50, cwe="CWE-1", reproducer={"script": "# ALWAYS\necho VULNSCAN-PROOF:$VULNSCAN_NONCE", "files": []}),
-                raw_candidate(title="Unproven", line=90, cwe="CWE-2", reproducer={"script": "# NEVER $VULNSCAN_NONCE", "files": []}),
+                raw_candidate(title="Fabricated", line=50, cwe="CWE-1", reproducer={"script": "# ALWAYS\necho THREADSCAN-PROOF:$THREADSCAN_NONCE", "files": []}),
+                raw_candidate(title="Unproven", line=90, cwe="CWE-2", reproducer={"script": "# NEVER $THREADSCAN_NONCE", "files": []}),
                 raw_candidate(title="Same bug again", line=2),  # duplicate of the first
                 {"title": "broken", "severity": "high"},  # invalid
             ],
@@ -160,7 +160,7 @@ def test_known_issues_and_seeds_reach_the_task(cfg, tmp_path, sample_repo):
     cfg.known_issues = "KNOWN.md"
     sarif = tmp_path / "c.sarif"
     sarif.write_text(json.dumps({"runs": [{"tool": {"driver": {"name": "CodeQL"}}, "results": [{"ruleId": "r", "message": {"text": "m"}, "locations": [{"physicalLocation": {"artifactLocation": {"uri": "backend/src/main/java/com/x/auth/Login.java"}, "region": {"startLine": 1}}}]}]}]}))
-    from vulnscan.config import SeedSpec
+    from threadscan.config import SeedSpec
 
     run_dir = run_scan(cfg, ScanOptions(mode="diff", dry_run=True, runs_dir=tmp_path / "runs", extra_seeds=[SeedSpec("codeql", sarif)]), log=lambda *_: None)
     task = json.loads(next((run_dir / "components").glob("*/task.json")).read_text())

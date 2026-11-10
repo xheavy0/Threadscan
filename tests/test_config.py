@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from vulnscan.config import DEFAULT_EXCLUDES, ConfigError, load_project, parse_repo_spec
+from threadscan.config import DEFAULT_EXCLUDES, ConfigError, load_project, parse_repo_spec
 
 
 def test_minimal_config_gets_safe_defaults(target_dir, tmp_path):

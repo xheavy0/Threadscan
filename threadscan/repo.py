@@ -12,7 +12,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from vulnscan.config import ProjectConfig
+from threadscan.config import ProjectConfig
 
 _GIT_ENV = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_TERMINAL_PROMPT": "0"}
 _SAFE = ["-c", "protocol.ext.allow=never", "-c", "protocol.file.allow=never", "-c", "core.fsmonitor=false"]

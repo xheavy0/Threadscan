@@ -5,3 +5,5 @@
 *.html text eol=lf
 *.yaml text eol=lf
 *.md text eol=lf
+*.woff2 binary
+*.svg text eol=lf

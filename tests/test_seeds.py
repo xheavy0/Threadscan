@@ -1,7 +1,7 @@
 import json
 
-from vulnscan.components import Component
-from vulnscan.seeds import assign_seeds, load_seed_file, parse_gitleaks, parse_osv, parse_sarif
+from threadscan.components import Component
+from threadscan.seeds import assign_seeds, load_seed_file, parse_gitleaks, parse_osv, parse_sarif
 
 SARIF = {
     "version": "2.1.0",
