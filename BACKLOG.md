@@ -26,7 +26,7 @@ the lab machine (see LAB-TEST.md).
   one. The drawer copies a ready Markdown issue body (never posts anything).
 - [x] **T3 Verified-fixes patch bundle**: one `verified-fixes.patch` with every patch the gate
   verified, in file order, each with a header naming its issue; export format `patches`.
-- [ ] **T4 `threadscan init <repo>`**: scaffold `targets/<name>/` (project.yaml, Dockerfile,
+- [x] **T4 `threadscan init <repo>`**: scaffold `targets/<name>/` (project.yaml, Dockerfile,
   threat_model.md) by detecting Maven, Gradle, npm/pnpm/yarn, Python, Go, Rust, .NET; never
   overwrites, never touches the target repo.
 - [ ] **T5 `threadscan seeds <target>`**: fetch seed input: the latest CodeQL SARIF per

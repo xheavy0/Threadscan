@@ -401,7 +401,14 @@ Residual risks to keep in mind:
 
 ## Adding a target
 
-Copy `targets/aegis/` as a template: point `repo` at the checkout, write a Dockerfile that
+`threadscan init <path-to-repo> [--name NAME]` writes `targets/<name>/` for you: it detects
+Maven, Gradle, npm/pnpm/yarn, Python, Go, Rust and .NET from their manifests, sets component
+roots from the source layout (for Java, down to the package root), and generates a Dockerfile
+that fetches dependencies and then checks the build works offline, a `Dockerfile.dockerignore`
+and a threat-model skeleton. Lines that need a decision say `TODO`. It never overwrites a
+target and never writes to the repository. Then review it and run `threadscan doctor <target> --live`.
+
+To write one by hand: Copy `targets/aegis/` as a template: point `repo` at the checkout, write a Dockerfile that
 leaves the source and an offline-ready build at `workdir`, describe trust boundaries and
 severity rules in `threat_model.md`, then `threadscan validate` and `threadscan components`.
 

@@ -148,6 +148,21 @@ def cmd_recheck(a) -> int:
     return 0
 
 
+def cmd_init(a) -> int:
+    from threadscan.init import scaffold
+
+    out, det = scaffold(Path(a.repo_path), Path(a.targets_dir), a.name)
+    cfg = load_project(out)
+    print(f"created {out}")
+    print("  detected: " + (", ".join(f"{s.kind} ({s.dir or 'root'})" for s in det.stacks) or "no known build manifest"))
+    print(f"  component roots: {', '.join(r or '(repo root)' for r, _ in det.roots) or 'none, add some'}")
+    print(f"  name {cfg.name}, auth {cfg.scan.auth}")
+    print("next: review the TODOs in Dockerfile and threat_model.md, then")
+    print(f"  threadscan components {out} --full")
+    print(f"  threadscan doctor {out} --live")
+    return 0
+
+
 def cmd_export(a) -> int:
     from threadscan.exporters import FORMATS, export
     from threadscan.triage import TriageStore
@@ -210,6 +225,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cache-dir", default=".cache")
     p.add_argument("--offline", action="store_true", help="do not fetch a remote repo")
     p.set_defaults(fn=cmd_recheck)
+
+    p = sub.add_parser("init", help="scaffold targets/<name>/ for a repository (detects the stack; never touches the repo)")
+    p.add_argument("repo_path", help="path to the repository to scan")
+    p.add_argument("--name", help="target name (default: the repository folder name)")
+    p.add_argument("--targets-dir", default="targets")
+    p.set_defaults(fn=cmd_init)
 
     p = sub.add_parser("export", help="export a run's verified issues: SARIF, CSV, JSON or a self-contained HTML report")
     p.add_argument("run", help="run directory, or a run id inside --runs-dir")
