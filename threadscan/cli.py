@@ -96,10 +96,31 @@ def cmd_scan(a) -> int:
     return 0
 
 
+def build_asker(a, runs_dir: Path):
+    """The Ask AI providers named on the command line, the defaults, or None with --no-ask."""
+    from threadscan.ask import Asker, check_names, default_providers, load_config, parse_spec
+
+    if a.no_ask:
+        return None
+    providers = []
+    if a.ask_config:
+        providers += load_config(Path(a.ask_config))
+    providers += [parse_spec(s) for s in a.ask_provider or []]
+    return Asker(runs_dir.resolve(), check_names(providers or default_providers()))
+
+
 def cmd_dashboard(a) -> int:
     from threadscan.dashboard import serve
 
-    serve(Path(a.runs_dir), a.port)
+    try:
+        asker = build_asker(a, Path(a.runs_dir))
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if asker:
+        names = ", ".join(f"{p.name} ({'local' if p.local else p.where})" for p in asker.providers.values())
+        print(f"Ask AI providers: {names}  (turn off with --no-ask)", flush=True)
+    serve(Path(a.runs_dir), a.port, asker)
     return 0
 
 
@@ -283,6 +304,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("dashboard", help="serve the local dashboard (progress and findings)")
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-ask", action="store_true", help="turn off Ask AI in the issue drawer")
+    p.add_argument("--ask-provider", action="append", metavar="SPEC",
+                   help="an Ask AI provider, repeatable: KIND[,name=..,model=..,base_url=..,key_env=..,budget_usd=..,max_tokens=..] "
+                        "with KIND one of claude-cli, anthropic, openai-compatible, ollama (default: claude-cli, anthropic, ollama)")
+    p.add_argument("--ask-config", metavar="YAML", help="a YAML file with a 'providers' list (same settings as --ask-provider)")
     p.set_defaults(fn=cmd_dashboard)
 
     p = sub.add_parser("recheck", help="re-run the reproducers of open issues on the current code (no agents, no API usage)")

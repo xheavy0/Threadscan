@@ -38,13 +38,15 @@ the lab machine (see LAB-TEST.md).
 - [x] **T7 `threadscan prune`**: keep the newest N finished runs per target (default 10);
   dry run unless `--yes`; never touches `triage.json`.
 
+- [x] **Ask AI about an issue**: a drawer tab and top-bar pill that ask any configured model
+  (local Claude Code CLI, Anthropic API, any OpenAI-compatible server, or local Ollama) about
+  one issue, with no tools, keys only from env vars, and the destination shown before sending.
+
 Also done along the way: dark mode is neutral graphite and the dashboard uses Rubik and
 Fira Code, the fonts Wiz's product UI loads.
 
 ## Proposed, needs a decision
 
-- **Ask Claude about an issue** from the drawer (explain, alternative fix). Would run Claude
-  Code locally and use subscription usage on every question, so it waits for your go-ahead.
 - **Notifications outside the machine** (Slack/Teams webhook). Sends data off the machine;
   waits for your go-ahead and a webhook you choose.
 

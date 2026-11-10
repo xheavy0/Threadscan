@@ -235,6 +235,50 @@ issue id, so they follow an issue across runs. An adjusted severity is used ever
 drawer's **Copy as GitHub issue** puts a ready Markdown issue (title, location, CWE/OWASP,
 verification, description, reproducer, verified patch) on the clipboard; nothing is posted. Resolved, risk-accepted and false-positive issues leave the open counts.
 
+#### Ask AI
+
+The issue drawer's **Ask AI** tab (and the **Ask AI** pill in the top bar) asks a model about
+one issue: quick prompts (explain simply, is the severity right, other ways to fix, how to
+test the fix) or your own question. Any model can answer; you choose which ones the
+dashboard offers when you start it:
+
+| Kind | What it uses | Where the issue goes |
+|---|---|---|
+| `claude-cli` | your local Claude Code CLI, signed in with your account (subscription) | Anthropic |
+| `anthropic` | the Messages API with `ANTHROPIC_API_KEY` (default model `claude-opus-5-5`) | Anthropic |
+| `openai-compatible` | any `/chat/completions` server: OpenAI, OpenRouter, Groq, LM Studio, vLLM, ... | that server (local if it is on 127.0.0.1/localhost) |
+| `ollama` | a local Ollama server (`http://127.0.0.1:11434`) | stays on this machine |
+
+```bash
+threadscan dashboard                                   # defaults: claude-cli, anthropic, ollama (those that are set up)
+threadscan dashboard --ask-provider claude-cli,model=haiku,budget_usd=0.10
+threadscan dashboard --ask-provider ollama,model=llama3.1:8b
+threadscan dashboard --ask-provider openai-compatible,name=groq,base_url=https://api.groq.com/openai/v1,key_env=GROQ_API_KEY,model=llama-3.3-70b-versatile
+threadscan dashboard --ask-config ask.yaml             # providers: [{kind: ..., name: ..., model: ...}, ...]
+threadscan dashboard --no-ask                          # turn it off
+```
+
+Settings per provider: `name`, `model`, `base_url`, `key_env` (the *name* of the environment
+variable holding the key), `budget_usd` (claude-cli's `--max-budget-usd`, default 0.50) and
+`max_tokens` (default 1500). The page only picks among these by name; it cannot add a
+provider or change a URL. `scan --dashboard` starts without Ask AI.
+
+What is sent: the issue's title, location, CWE/OWASP, description, impact, gate evidence,
+reproducer, patch and triage note, the run's threat model and up to six earlier answers on
+the same issue. The drawer says plainly whether that leaves the machine and to which host.
+Safety:
+
+- Keys are read from environment variables when a question is sent; they are never stored,
+  logged or shown, and are scrubbed from answers and errors.
+- No provider gets tools. `claude-cli` runs with `--tools ""`, `--strict-mcp-config`,
+  `--no-session-persistence` and a budget cap, in an empty working directory, so no project
+  files or `CLAUDE.md` are read. HTTP calls never follow redirects.
+- Issue text comes from scanning untrusted code, so the prompt frames it as data. Answers
+  are shown as text (code blocks in `<pre>`), never as HTML, and are advice to review.
+- One question at a time (a second gets 409), 2000 characters at most, a timeout, and the
+  same same-origin / custom-header / JSON guard as triage. Questions and answers are kept,
+  redacted, in `runs/ask/<issue-id>.json`.
+
 ## How it works
 
 ```

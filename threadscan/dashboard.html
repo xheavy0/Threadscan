@@ -90,6 +90,20 @@ svg.i.sm { width: 15px; height: 15px; }
 .icon-btn { width: 38px; height: 38px; border-radius: 8px; justify-content: center; color: var(--text-2); border: 1px solid transparent; }
 .icon-btn:hover { background: var(--bg-3); color: var(--text); }
 .icon-btn.boxed { border-color: var(--line-2); }
+.ask-pill { height: 34px; padding: 0 14px 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--card); color: var(--text); font-size: 13.5px; font-weight: 500; gap: 7px; }
+.ask-pill svg { color: var(--primary); }
+.ask-pill:hover { border-color: var(--primary); background: var(--primary-soft); }
+.ask-pill[disabled] { opacity: .5; cursor: not-allowed; }
+.ask-where { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.ask-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.ask-log { display: flex; flex-direction: column; gap: 14px; margin-top: 18px; }
+.ask-q { align-self: flex-end; max-width: 88%; background: var(--primary-soft); color: var(--text); border-radius: 12px 12px 2px 12px; padding: 9px 13px; white-space: pre-wrap; font-size: 14px; }
+.ask-a { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--card); }
+.ask-a.err { border-color: var(--bad-fg); }
+.ask-a p { margin: 0 0 8px; white-space: pre-wrap; color: var(--text); font-size: 14px; }
+.ask-a pre { margin: 6px 0 10px; }
+.ask-meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ask-send { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: #d8f3e4; color: #12804a; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
 
 /* ---------- page ---------- */
@@ -385,6 +399,7 @@ const ICON = {
   bookmark: '<path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" />',
   findings: '<path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="3" /> <path d="m16 16-1.9-1.9" />',
   policies: '<path d="M15 12h-5" /> <path d="M15 8h-5" /> <path d="M19 17V5a2 2 0 0 0-2-2H4" /> <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />',
+  sparkles: '<path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" />',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" />',
 };
 const PHASES = ["planning", "building", "scanning", "verifying", "reporting"];
@@ -412,6 +427,7 @@ const S = {
   view: "overview", q: "", filters: { severity: new Set(), status: new Set(), lifecycle: new Set(), component: new Set(), owasp: new Set() },
   group: "none", openGroups: new Set(), selected: null, dtab: "overview", timer: null, menu: null, gateFilter: "all",
   seeds: { seeds: [], unassigned: 0 }, plan: null, seedTool: "all", seedVerdict: "all", phases: {},
+  ask: { enabled: false, providers: [], def: null, hist: {}, pending: null, draft: "", err: null },
 };
 function store(key, fallback) { try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch (e) { return fallback; } }
 function storeSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
@@ -558,6 +574,97 @@ async function saveTriage(id, body) {
   return data;
 }
 
+/* Ask AI: one issue, a provider chosen by whoever started the dashboard */
+const ASK_QUICK = [
+  ["Explain simply", "Explain this issue simply: what is wrong, how an attacker would use it, and what the impact is."],
+  ["Is the severity right?", "Is the severity right for this issue? Use the threat model, and say what would raise or lower it."],
+  ["Other ways to fix", "Besides the proposed patch, what other ways are there to fix this? Compare their trade-offs."],
+  ["How to test the fix", "How should we test the fix? Suggest tests and what each one should assert."],
+];
+async function loadAskProviders() {
+  try { const a = await getJSON("/api/ask/providers"); S.ask.enabled = a.enabled; S.ask.providers = a.providers || []; S.ask.def = a.default; }
+  catch (e) { S.ask.enabled = false; }
+}
+async function loadAskHistory(id) {
+  try { S.ask.hist[id] = (await getJSON("/api/ask/" + encodeURIComponent(id))).history || []; } catch (e) { S.ask.hist[id] = S.ask.hist[id] || []; }
+}
+function askProvider() {
+  const want = store("ts.askProvider", null), ok = S.ask.providers.filter(x => x.available);
+  return (ok.find(x => x.name === want) || ok.find(x => x.name === S.ask.def) || ok[0] || null);
+}
+function openAsk(f) {
+  S.selected = f.id; S.dtab = "ask"; renderDrawer(); renderMainOnly();
+  Promise.all([loadAskProviders(), loadAskHistory(f.id)]).then(() => { if (S.selected === f.id && S.dtab === "ask") renderDrawer(); });
+}
+async function sendAsk(f, question) {
+  const q = (question || "").trim();
+  if (!q || S.ask.pending) return;
+  const p = askProvider();
+  S.ask.pending = f.id; S.ask.err = null; S.ask.draft = ""; S.ask.asking = q;
+  if (S.selected === f.id && S.dtab === "ask") renderDrawer();
+  try {
+    const r = await fetch("/api/ask/" + encodeURIComponent(f.id) + "?run=" + encodeURIComponent(S.current), { method: "POST",
+      headers: { "Content-Type": "application/json", "X-Threadscan-Request": "1" }, body: JSON.stringify({ question: q, provider: p ? p.name : null }) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "the question failed");
+    (S.ask.hist[f.id] = S.ask.hist[f.id] || []).push(data);
+  } catch (e) { S.ask.err = e.message; S.ask.draft = q; }
+  finally { S.ask.pending = null; S.ask.asking = null; if (S.selected === f.id && S.dtab === "ask") renderDrawer(); }
+}
+function answerNodes(text) {
+  /* Plain text with fenced code blocks; everything goes in as text, never as HTML. */
+  const out = []; let buf = [], code = null;
+  const flush = () => { const t = buf.join("\n").trim(); if (t) out.push(h("p", null, t)); buf = []; };
+  for (const line of (text || "").split("\n")) {
+    if (/^\s*```/.test(line)) {
+      if (code === null) { flush(); code = []; } else { out.push(h("pre", null, code.join("\n"))); code = null; }
+    } else (code === null ? buf : code).push(line);
+  }
+  if (code !== null) out.push(h("pre", null, code.join("\n")));
+  flush();
+  return out;
+}
+function askMeta(e) {
+  const bits = [e.provider + (e.model ? " · " + e.model : ""), e.local ? "local" : "cloud"];
+  if (e.cost_usd != null) bits.push("$" + Number(e.cost_usd).toFixed(4));
+  if (e.tokens && (e.tokens.in != null || e.tokens.out != null)) bits.push((e.tokens.in || 0) + " in / " + (e.tokens.out || 0) + " out tokens");
+  if (e.seconds != null) bits.push(e.seconds + "s");
+  if (e.truncated) bits.push("cut off at the token limit");
+  bits.push(when(e.at));
+  return h("div", { class: "ask-meta" }, bits.map(b => h("span", null, b)));
+}
+function askTab(f) {
+  const A = S.ask;
+  if (!A.enabled) return [h("div", { class: "callout" }, "Ask AI is turned off for this dashboard. Start it without --no-ask, and pick providers with --ask-provider (see the README).")];
+  if (!A.providers.length) return [h("p", { class: "muted" }, "Loading providers...")];
+  const p = askProvider();
+  const sel = h("select", { class: "select", "aria-label": "Provider" }, A.providers.map(x => h("option", { value: x.name, disabled: !x.available },
+    x.name + (x.model ? " · " + x.model : "") + (x.available ? (x.local ? " (local)" : " (cloud)") : " — " + (x.reason || "unavailable")))));
+  if (p) sel.value = p.name;
+  sel.addEventListener("change", () => { storeSet("ts.askProvider", sel.value); renderDrawer(); });
+  const where = !p ? h("span", { class: "status warn" }, "No provider is available: see the reasons in the list")
+    : p.local ? h("span", { class: "status ok" }, "Stays on this machine")
+    : h("span", { class: "status warn", title: "Sent: title, location, description, evidence, reproducer, patch, triage note, the run's threat model and earlier questions on this issue" }, "Sends this issue to " + p.where);
+  const busy = !!A.pending;
+  const ta = h("textarea", { class: "textarea", placeholder: "Ask about this issue", maxlength: "2000", "aria-label": "Question", disabled: busy || !p });
+  ta.value = A.draft || "";
+  ta.addEventListener("input", () => { A.draft = ta.value; });
+  ta.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendAsk(f, ta.value); } });
+  const hist = A.hist[f.id] || [];
+  const log = hist.map(e => [h("div", { class: "ask-q" }, e.question),
+    h("div", { class: "ask-a" + (e.ok ? "" : " err") }, e.ok ? answerNodes(e.answer) : h("p", null, "No answer: " + (e.error || "unknown error")), askMeta(e))]);
+  if (A.pending === f.id) log.push(h("div", { class: "ask-q" }, A.asking || ""), h("div", { class: "ask-a" }, h("p", { class: "muted" }, "Thinking... (" + (p ? p.name : "") + ")")));
+  return [
+    h("div", { class: "ask-where" }, sel, where),
+    h("div", { class: "ask-chips" }, ASK_QUICK.map(([label, q]) => h("button", { class: "btn-ghost", type: "button", disabled: busy || !p, onclick: () => sendAsk(f, q) }, label))),
+    ta,
+    h("div", { class: "ask-send" }, h("button", { class: "btn-primary", type: "button", disabled: busy || !p, onclick: () => sendAsk(f, ta.value) }, busy ? "Waiting..." : "Ask"),
+      h("span", { class: "muted", style: "font-size:12.5px" }, "Ctrl+Enter sends. One question at a time; answers are advice to review, and are kept in runs/ask/."),
+      A.err ? h("span", { style: "color:var(--bad-fg);font-size:13px", role: "status" }, A.err) : null),
+    hist.length || A.pending === f.id ? h("div", { class: "ask-log" }, log) : h("p", { class: "muted", style: "margin-top:16px" }, "No questions yet. Try a quick prompt above."),
+  ];
+}
+
 /* dropdown menus */
 function closeMenu() { if (S.menu) { S.menu.remove(); S.menu = null; } }
 function openMenu(anchor, items, onPick, multi) {
@@ -648,7 +755,10 @@ function renderTop() {
       label: x.project + " · " + (x.mode === "full" ? "full" : "diff") + " · " + when(x.started) + (x.dry_run ? " · dry run" : x.phase === "done" ? " · " + ((x.counts || {}).verified || 0) + " verified" : " · " + x.phase) }))], id => select(id), false);
   };
   const unread = unreadCount();
+  const askTarget = () => S.findings.find(x => x.id === S.selected) || [...openIssues()].sort((a, b) => SEVS.indexOf(a.severity) - SEVS.indexOf(b.severity))[0];
   act.replaceChildren(
+    S.ask.enabled ? h("button", { class: "ask-pill hide-sm", type: "button", disabled: !askTarget(), title: askTarget() ? "Ask AI about " + (S.selected ? "this issue" : "the most severe open issue") : "No open issues to ask about",
+      onclick: () => { const f = askTarget(); if (f) openAsk(f); } }, icon("sparkles", "sm"), "Ask AI") : null,
     h("button", { class: "icon-btn bell", type: "button", title: "Notifications", "aria-label": "Notifications" + (unread ? " (" + unread + " unread)" : ""),
       onclick: e => { e.stopPropagation(); openBell(e.currentTarget); } }, icon("bell"), unread ? h("span", { class: "dot" }) : null),
     h("a", { class: "icon-btn", href: "/api/runs/" + encodeURIComponent(S.st.run_id) + "/report", target: "_blank", rel: "noopener", title: "Open report.md" }, icon("file")),
@@ -1126,7 +1236,7 @@ function renderDrawer() {
   }
   statusSel.addEventListener("change", () => save());
   assignee.addEventListener("change", () => save());
-  const tabs = [["overview", "Overview"], ["graph", "Graph"], ["evidence", "Evidence"], ["reproducer", "Reproducer"], ["remediation", "Remediation"], ["activity", "Activity"]];
+  const tabs = [["overview", "Overview"], ["graph", "Graph"], ["evidence", "Evidence"], ["reproducer", "Reproducer"], ["remediation", "Remediation"], ["ask", "Ask AI"], ["activity", "Activity"]];
   let body;
   if (S.dtab === "overview") body = [
     h("dl", { class: "facts" }, [["Severity", sevLabel(f.severity)], ["Verification", h("span", { class: "status ok" }, (v.status === "re-verified" ? "Re-verified" : "Verified") + " · patch " + (v.patch_check || "—"))],
@@ -1149,6 +1259,7 @@ function renderDrawer() {
       h("button", { class: "btn-ghost", type: "button", onclick: () => download(f.id + ".patch", f.patch, "text/x-diff") }, icon("download", "sm"), "Download .patch"),
       h("span", { class: "muted", style: "font-size:12.5px" }, (f.verification || {}).patch_check === "fixed" ? "Verified: with this patch the reproducer no longer reproduces. Apply with git apply." : "Not verified by the gate.")) : null,
     f.patch ? diffPre(f.patch) : h("p", null, "—")];
+  else if (S.dtab === "ask") body = askTab(f);
   else {
     const note = h("textarea", { class: "textarea", placeholder: "Add a note for this issue", maxlength: "4000", "aria-label": "Note" });
     note.value = t.note || "";
@@ -1166,7 +1277,7 @@ function renderDrawer() {
       h("div", { class: "d-ctrl" }, statusSel, sevSel, assignee,
         h("button", { class: "btn-ghost", type: "button", title: "Copy a Markdown issue (title on the first line) to paste into GitHub; nothing is posted",
           onclick: e => { const gi = githubIssue(f); copyText(gi.title + "\n\n" + gi.body, e.currentTarget); } }, icon("copy", "sm"), "Copy as GitHub issue"), saved),
-      h("div", { class: "d-tabs", role: "tablist" }, tabs.map(([k, l]) => h("button", { type: "button", role: "tab", "aria-selected": String(S.dtab === k), onclick: () => { S.dtab = k; renderDrawer(); } }, l)))),
+      h("div", { class: "d-tabs", role: "tablist" }, tabs.map(([k, l]) => h("button", { type: "button", role: "tab", "aria-selected": String(S.dtab === k), onclick: () => { if (k === "ask") openAsk(f); else { S.dtab = k; renderDrawer(); } } }, k === "ask" ? [icon("sparkles", "sm"), " ", l] : l)))),
     h("div", { class: "d-body" }, body));
   d.classList.add("open"); scrim.classList.add("open");
 }
@@ -1202,6 +1313,7 @@ async function refresh() {
     notifyTransitions();
     if (!S.current && S.runs.length) S.current = S.runs[0].run_id;
     if (!S.owasp.length) S.owasp = await getJSON("/api/owasp");
+    if (!S.ask.loaded) { S.ask.loaded = true; await loadAskProviders(); }
     if (S.current) {
       const id = encodeURIComponent(S.current);
       [S.st, S.findings, S.lc, S.triage, S.seeds, S.plan] = await Promise.all([getJSON("/api/runs/" + id), getJSON("/api/runs/" + id + "/findings"), getJSON("/api/runs/" + id + "/lifecycle"),

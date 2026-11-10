@@ -6,7 +6,8 @@ reach it through DNS rebinding). It reads only files it names inside ``runs/<run
 Its one write is triage state (``runs/triage.json``), accepted only as a JSON POST that
 carries the ``X-Threadscan-Request`` header from the dashboard's own origin: a page on
 another site cannot send that header without a CORS preflight, which this server never
-answers.
+answers. The same guard covers Ask AI questions (``POST /api/ask/<id>``), which send one issue
+to the provider the person picks from those configured when the dashboard was started.
 """
 
 from __future__ import annotations
@@ -15,9 +16,10 @@ import json
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from threadscan import history
+from threadscan.ask import ID_RE, AskStore, Asker
 from threadscan.exporters import FORMATS, export
 from threadscan.owasp import categories, categorize
 from threadscan.redact import redact_obj
@@ -113,10 +115,11 @@ def run_plan(run_dir: Path) -> dict:
     return {k: plan.get(k) for k in ("meta", "policy", "components", "seeds", "commands")}
 
 
-def make_handler(runs_dir: Path, port: int):
+def make_handler(runs_dir: Path, port: int, asker: Asker | None = None):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     allowed_origins = {f"http://{h}" for h in allowed_hosts}
     triage = TriageStore(runs_dir / "triage.json")
+    ask_store = asker.store if asker else AskStore(runs_dir)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "threadscan-dashboard"
@@ -171,6 +174,15 @@ def make_handler(runs_dir: Path, port: int):
                 return self._json(list_rechecks(runs_dir))
             if path == "/api/owasp":
                 return self._json(categories())
+            if path == "/api/ask/providers":
+                if asker is None:
+                    return self._json({"enabled": False, "providers": [], "default": None})
+                return self._json({"enabled": True, "providers": asker.provider_list(), "default": asker.default_provider()})
+            m = re.match(r"^/api/ask/([^/]+)$", path)
+            if m:
+                if not ID_RE.match(m.group(1)):
+                    return self._json({"error": "unknown issue"}, 404)
+                return self._json({"history": ask_store.history(m.group(1))})
             m = re.match(r"^/api/projects/([^/]+)/history$", path)
             if m:
                 if not PROJECT_RE.match(m.group(1)):
@@ -223,7 +235,11 @@ def make_handler(runs_dir: Path, port: int):
                 return self._json({"error": "missing request header"}, 403)
             if not (self.headers.get("content-type") or "").startswith("application/json"):
                 return self._json({"error": "JSON only"}, 415)
-            path = unquote(urlparse(self.path).path)
+            url = urlparse(self.path)
+            path = unquote(url.path)
+            m = re.match(r"^/api/ask/([^/]+)$", path)
+            if m:
+                return self._ask(m.group(1), (parse_qs(url.query).get("run") or [""])[0], raw)
             m = re.match(r"^/api/triage/([^/]+)$", path)
             if not m:
                 return self._send(404, b"not found", "text/plain")
@@ -234,12 +250,36 @@ def make_handler(runs_dir: Path, port: int):
                 return self._json({"error": str(exc)}, 400)
             return self._json(entry)
 
+        def _ask(self, issue_id: str, run_id: str, raw: bytes):
+            if asker is None:
+                return self._json({"error": "Ask AI is turned off for this dashboard"}, 403)
+            d = run_dir_for(runs_dir, run_id)
+            if not ID_RE.match(issue_id) or d is None:
+                return self._json({"error": "unknown issue or run"}, 404)
+            finding = next((f for f in run_findings(d) if f.get("id") == issue_id), None)
+            if finding is None:
+                return self._json({"error": "unknown issue or run"}, 404)
+            try:
+                body = json.loads(raw or b"null")
+                if not isinstance(body, dict) or not isinstance(body.get("question"), str):
+                    raise ValueError("send {question, provider}")
+                provider = body.get("provider")
+                if provider is not None and not isinstance(provider, str):
+                    raise ValueError("provider must be a name")
+                tm = ((run_plan(d).get("policy") or {}).get("threat_model")) or None
+                entry = asker.ask(finding, triage.load().get(issue_id), tm, body["question"], provider, d.name)
+            except BlockingIOError as exc:
+                return self._json({"error": str(exc)}, 409)
+            except ValueError as exc:
+                return self._json({"error": str(exc)}, 400)
+            return self._json(entry)
+
     return Handler
 
 
-def serve(runs_dir: Path, port: int = 8765) -> None:
+def serve(runs_dir: Path, port: int = 8765, asker: Asker | None = None) -> None:
     runs_dir = runs_dir.resolve()
-    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runs_dir, port))
+    server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runs_dir, port, asker))
     server.daemon_threads = True
     print(f"threadscan dashboard: http://127.0.0.1:{port}/  (runs: {runs_dir}; Ctrl+C to stop)", flush=True)
     try:
