@@ -278,6 +278,32 @@ pre .add { color: var(--ok-fg); } pre .del { color: var(--bad-fg); } pre .hunk {
 .timeline time { color: var(--muted); font-size: 12.5px; display: block; }
 .saved { color: var(--ok-fg); font-size: 13px; }
 
+/* ---------- bell, copy row, policies, findings ---------- */
+.bell { position: relative; }
+.bell .dot { position: absolute; top: 7px; right: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-bar); box-shadow: 0 0 0 2px var(--bg); }
+.menu.wide { min-width: 340px; max-width: 380px; }
+.menu .ev-item { display: flex; gap: 10px; padding: 9px 10px; border-radius: 7px; font-size: 13.5px; color: var(--text-2); width: 100%; text-align: left; align-items: flex-start; }
+.menu .ev-item:hover { background: var(--bg-3); }
+.menu .ev-item .ic { width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--bg-3); }
+.menu .ev-item .ic.bad { background: var(--bad-bg); color: var(--bad-fg); } .menu .ev-item .ic.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.menu .ev-item .ic.warn { background: var(--warn-bg); color: var(--warn-fg); } .menu .ev-item .ic.blue { background: var(--primary-soft); color: var(--primary); }
+.menu .ev-item time { display: block; color: var(--muted); font-size: 12px; }
+.menu .ev-item.unread { background: var(--primary-soft); }
+.menu .foot { border-top: 1px solid var(--line); margin-top: 4px; padding: 6px 4px 2px; display: flex; justify-content: space-between; gap: 8px; }
+.copy-row { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; flex-wrap: wrap; }
+.btn-ghost { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--card); font-size: 13px; color: var(--text-2); }
+.btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+.kvt { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.kvt td { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.kvt tr:last-child td { border-bottom: 0; }
+.kvt td:first-child { color: var(--muted); width: 46%; padding-left: 0; }
+.kvt td:last-child { color: var(--text); padding-right: 0; }
+.tm { white-space: pre-wrap; max-height: 560px; }
+details.cmds summary { cursor: pointer; color: var(--primary); font-size: 14px; padding: 4px 0; }
+.tool { font: 600 11.5px var(--mono); text-transform: uppercase; letter-spacing: .03em; padding: 2px 7px; border-radius: 6px; background: var(--bg-3); color: var(--text-2); }
+.link { color: var(--primary); cursor: pointer; }
+.link:hover { text-decoration: underline; }
+
 .welcome { max-width: 560px; margin: 12vh auto 0; text-align: center; }
 .welcome img { width: 64px; height: 64px; }
 .welcome h1 { font: 500 26px var(--head); margin: 16px 0 6px; }
@@ -357,6 +383,11 @@ const ICON = {
   target: '<circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" />',
   fix: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />',
   ok: '<circle cx="12" cy="12" r="10" /> <path d="m16 9-5.5 5.5L8 12" />',
+  bell: '<path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />',
+  bookmark: '<path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" />',
+  findings: '<path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /> <circle cx="12" cy="12" r="3" /> <path d="m16 16-1.9-1.9" />',
+  policies: '<path d="M15 12h-5" /> <path d="M15 8h-5" /> <path d="M19 17V5a2 2 0 0 0-2-2H4" /> <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /> <path d="M21 3v5h-5" /> <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /> <path d="M8 16H3v5" />',
 };
 const PHASES = ["planning", "building", "scanning", "verifying", "reporting"];
@@ -374,14 +405,27 @@ const REASONS = {
   patch_missing: "No patch", patch_failed_to_apply: "Patch did not apply", patch_did_not_fix: "Patch did not fix",
   patched_run_inconclusive: "Fix unproven", agent_error: "Agent failed"
 };
-const VIEWS = [["overview", "Boards", "overview"], ["issues", "Issues", "issues"], ["graph", "Graph", "graph"], ["components", "Inventory", "components"],
-  ["gate", "Gate", "gate"], ["trends", "Trends", "trends"], ["compliance", "Compliance", "compliance"]];
+const VIEWS = [["overview", "Boards", "overview"], ["issues", "Issues", "issues"], ["findings", "Findings", "findings"], ["graph", "Graph", "graph"],
+  ["components", "Inventory", "components"], ["gate", "Gate", "gate"], ["trends", "Trends", "trends"], ["compliance", "Compliance", "compliance"],
+  ["policies", "Policies", "policies"]];
+const VERDICT = { true_positive: ["bad", "Agent: true positive"], false_positive: ["", "Agent: false positive"], unsure: ["warn", "Agent: unsure"], not_reviewed: ["", "Not reviewed"] };
 
 const S = {
   runs: [], current: null, st: null, findings: [], lc: {}, hist: [], triage: {}, owasp: [],
   view: "overview", q: "", filters: { severity: new Set(), status: new Set(), lifecycle: new Set(), component: new Set(), owasp: new Set() },
   group: "none", openGroups: new Set(), selected: null, dtab: "overview", timer: null, menu: null, gateFilter: "all",
+  seeds: { seeds: [], unassigned: 0 }, plan: null, seedTool: "all", seedVerdict: "all", phases: {},
 };
+function store(key, fallback) { try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch (e) { return fallback; } }
+function storeSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+function download(name, text, type) {
+  const a = h("a", { href: URL.createObjectURL(new Blob([text], { type })), download: name });
+  document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => { btn.replaceChildren(icon("copy", "sm"), old.replace("Copied", "") || "Copy"); }, 1200); }
+  catch (e) { btn.textContent = "Copy failed"; }
+}
 
 function icon(name, cls) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -502,6 +546,67 @@ function openMenu(anchor, items, onPick, multi) {
 }
 document.addEventListener("click", e => { if (S.menu && !S.menu.contains(e.target)) { closeMenu(); render(); } });
 
+/* notifications: derived from the runs on this machine; read state per browser */
+function events() {
+  const out = [];
+  for (const r of S.runs) {
+    const c = r.counts || {}, label = r.project + " · " + (r.mode === "full" ? "full" : "diff");
+    if (r.dry_run) continue;
+    if (r.phase === "failed") out.push({ ts: r.finished || r.updated, cls: "bad", ic: "alert", text: label + " failed: " + (r.message || "see the run"), run: r.run_id });
+    else if (r.phase === "done" && /usage limit/.test(r.message || "")) out.push({ ts: r.finished, cls: "warn", ic: "alert", text: label + " stopped at the usage limit; resume command in the report", run: r.run_id });
+    else if (r.phase === "done") out.push({ ts: r.finished, cls: (c.verified || 0) ? "bad" : "ok", ic: (c.verified || 0) ? "issues" : "ok", text: label + " finished: " + (c.verified || 0) + " verified, " + (c.dropped || 0) + " dropped", run: r.run_id });
+    else out.push({ ts: r.updated, cls: "blue", ic: "refresh", text: label + " is running (" + (PHASE_LABEL[r.phase] || r.phase) + ")", run: r.run_id, live: true });
+  }
+  return out.filter(e => e.ts).sort((a, b) => b.ts - a.ts).slice(0, 20);
+}
+function unreadCount() { const seen = store("threadscan-seen", 0); return events().filter(e => !e.live && e.ts > seen).length; }
+function notifyTransitions() {
+  for (const r of S.runs) {
+    const before = S.phases[r.run_id];
+    if (before && !["done", "failed"].includes(before) && ["done", "failed"].includes(r.phase) && store("threadscan-desktop", false) && "Notification" in window && Notification.permission === "granted") {
+      try { new Notification("Threadscan: " + r.project, { body: r.phase === "failed" ? "Run failed" : ((r.counts || {}).verified || 0) + " verified issues", icon: "/static/threadscan.svg" }); } catch (e) {}
+    }
+    S.phases[r.run_id] = r.phase;
+  }
+}
+function openBell(anchor) {
+  closeMenu();
+  const seen = store("threadscan-seen", 0), list = events();
+  const r = anchor.getBoundingClientRect();
+  const desktopOn = store("threadscan-desktop", false) && "Notification" in window && Notification.permission === "granted";
+  const m = h("div", { class: "menu wide", style: `left:${Math.max(8, r.right + scrollX - 380)}px;top:${r.bottom + scrollY + 6}px` },
+    h("div", { class: "head" }, "Notifications"),
+    list.length ? list.map(e => h("button", { class: "ev-item" + (!e.live && e.ts > seen ? " unread" : ""), type: "button", onclick: ev => { ev.stopPropagation(); closeMenu(); select(e.run); } },
+      h("span", { class: "ic " + e.cls }, icon(e.ic, "sm")), h("span", null, e.text, h("time", null, when(e.ts))))) : h("div", { class: "muted", style: "padding:10px" }, "Nothing yet."),
+    h("div", { class: "foot" },
+      h("button", { class: "link-btn", type: "button", style: "height:28px", onclick: ev => { ev.stopPropagation(); storeSet("threadscan-seen", Date.now() / 1000); closeMenu(); renderTop(); } }, "Mark all read"),
+      "Notification" in window ? h("button", { class: "link-btn", type: "button", style: "height:28px", onclick: async ev => {
+        ev.stopPropagation();
+        if (desktopOn) { storeSet("threadscan-desktop", false); } else { const p = await Notification.requestPermission(); storeSet("threadscan-desktop", p === "granted"); }
+        closeMenu(); renderTop();
+      } }, desktopOn ? "Desktop alerts: on" : "Enable desktop alerts") : null));
+  document.body.append(m);
+  S.menu = m;
+}
+
+/* saved views (per browser) */
+function savedViews() { return store("threadscan-views", []); }
+function currentView() { return { filters: Object.fromEntries(Object.entries(S.filters).map(([k, v]) => [k, [...v]])), group: S.group, q: S.q }; }
+function applyView(v) {
+  for (const [k, set] of Object.entries(S.filters)) { set.clear(); (v.filters[k] || []).forEach(x => set.add(x)); }
+  S.group = v.group || "none"; S.q = v.q || ""; document.getElementById("q").value = S.q; S.openGroups = new Set(); render();
+}
+function viewsMenu(anchor) {
+  const views = savedViews();
+  openMenu(anchor, [{ head: "Saved views" }, ...views.map((v, i) => ({ value: "apply:" + i, label: v.name })),
+    { value: "save", label: "Save current view…" }, ...(views.length ? [{ head: "Delete" }, ...views.map((v, i) => ({ value: "del:" + i, label: "× " + v.name }))] : [])],
+    val => {
+      if (val === "save") { const name = (prompt("Name for this view") || "").trim().slice(0, 60); if (name) { storeSet("threadscan-views", [...savedViews().filter(v => v.name !== name), { name, ...currentView() }]); render(); } }
+      else if (val.startsWith("apply:")) applyView(views[+val.slice(6)]);
+      else if (val.startsWith("del:")) { storeSet("threadscan-views", views.filter((_, i) => i !== +val.slice(4))); render(); }
+    }, false);
+}
+
 /* rail + top bar */
 function renderRail() {
   document.getElementById("rail-items").replaceChildren(...VIEWS.map(([k, label, ic]) => h("button", { class: "rail-item" + (S.view === k ? " active" : ""), type: "button", "aria-current": S.view === k ? "page" : null,
@@ -516,7 +621,10 @@ function renderTop() {
     openMenu(scope, [{ head: "Scan runs" }, ...S.runs.map(x => ({ value: x.run_id, sel: x.run_id === S.current,
       label: x.project + " · " + (x.mode === "full" ? "full" : "diff") + " · " + when(x.started) + (x.dry_run ? " · dry run" : x.phase === "done" ? " · " + ((x.counts || {}).verified || 0) + " verified" : " · " + x.phase) }))], id => select(id), false);
   };
+  const unread = unreadCount();
   act.replaceChildren(
+    h("button", { class: "icon-btn bell", type: "button", title: "Notifications", "aria-label": "Notifications" + (unread ? " (" + unread + " unread)" : ""),
+      onclick: e => { e.stopPropagation(); openBell(e.currentTarget); } }, icon("bell"), unread ? h("span", { class: "dot" }) : null),
     h("a", { class: "icon-btn", href: "/api/runs/" + encodeURIComponent(S.st.run_id) + "/report", target: "_blank", rel: "noopener", title: "Open report.md" }, icon("file")),
     h("button", { class: "icon-btn", type: "button", title: "Refresh", onclick: () => refresh() }, icon("refresh")),
     h("span", { class: "avatar", title: "Local user" }, "TS"));
@@ -693,6 +801,7 @@ function issuesView() {
     filterPill("owasp", "OWASP", owaspIds.map(x => ({ value: x, label: owaspName(x), count: count(owaspOf)(x) }))),
     anyFilter ? h("button", { class: "link-btn", type: "button", onclick: () => { Object.values(S.filters).forEach(z => z.clear()); S.q = ""; document.getElementById("q").value = ""; render(); } }, "Reset") : null,
     h("span", { class: "results-count" }, list.length + " issues",
+      h("button", { class: "fpill", type: "button", onclick: e => { e.stopPropagation(); viewsMenu(e.currentTarget); } }, icon("bookmark", "sm"), "Views", savedViews().length ? h("span", { class: "muted" }, savedViews().length) : null),
       h("button", { class: "icon-btn boxed", type: "button", title: "Export", onclick: e => { e.stopPropagation(); openMenu(e.currentTarget, [{ head: "Export " + list.length + " issues" }, { value: "csv", label: "CSV" }, { value: "json", label: "JSON" }], k => exportIssues(list, k), false); } }, icon("download"))));
   const group = h("div", { class: "groupby" }, h("span", { class: "lbl" }, "GROUP BY"),
     [["none", "None"], ["component", "Component"], ["owasp", "OWASP"], ["severity", "Severity"], ["status", "Status"]].map(([k, l]) =>
@@ -859,6 +968,68 @@ function complianceView() {
         h("span", { class: "foot" }, list.length ? h("span", { class: "status bad" }, list.length + " open") : h("span", { class: "status" }, "No verified issues"), sevCounts(list))); }))];
 }
 
+/* ---------- Findings (seeds from CodeQL / gitleaks / OSV) ---------- */
+function issueForSeed(id) { return S.findings.find(f => (f.seed_ids || []).includes(id)); }
+function findingsView() {
+  const all = S.seeds.seeds || [];
+  const tools = [...new Set(all.map(x => x.tool))].sort();
+  const vkey = x => x.verdict || (x.component ? "pending" : "unassigned");
+  const q = S.q.trim().toLowerCase();
+  const list = all.filter(x => (S.seedTool === "all" || x.tool === S.seedTool) && (S.seedVerdict === "all" || vkey(x) === S.seedVerdict) &&
+    (!q || [x.rule, x.file, x.message, x.component].join(" ").toLowerCase().includes(q)));
+  const verdictLabel = { true_positive: "True positive", false_positive: "False positive", unsure: "Unsure", not_reviewed: "Not reviewed", pending: "No verdict", unassigned: "Not in a scanned component" };
+  const chips = h("div", { class: "filters" },
+    ["all", ...tools].map(t => h("button", { class: "qchip", type: "button", "aria-pressed": String(S.seedTool === t), onclick: () => { S.seedTool = t; renderMainOnly(); } },
+      t === "all" ? "All tools" : t, h("span", { class: "muted" }, t === "all" ? all.length : all.filter(x => x.tool === t).length))),
+    h("span", { class: "results-count" }, list.length + " findings",
+      h("select", { class: "select", "aria-label": "Agent verdict", onchange: e => { S.seedVerdict = e.target.value; renderMainOnly(); } },
+        ["all", ...Object.keys(verdictLabel)].map(k => { const o = h("option", { value: k }, k === "all" ? "All verdicts" : verdictLabel[k]); if (k === S.seedVerdict) o.selected = true; return o; }))));
+  const body = !all.length ? h("div", { class: "empty" }, h("div", { class: "ic" }, icon("findings")), h("div", { class: "ttl" }, "No scanner findings in this run"),
+      "Seeds are optional input from CodeQL (SARIF), gitleaks and OSV. Export them to targets/" + S.st.project + "/seeds/ or pass --seed TOOL=PATH; the agents triage them and only verified ones become issues.")
+    : list.length ? h("div", { class: "table-wrap" }, h("table", null,
+      h("thead", null, h("tr", null, ["Tool", "Rule", "Location", "Component", "Agent verdict", "Verified issue"].map(x => h("th", null, x)))),
+      h("tbody", null, list.map(x => { const iss = issueForSeed(x.id), v = VERDICT[x.verdict]; return h("tr", null,
+        h("td", null, h("span", { class: "tool" }, x.tool)),
+        h("td", null, h("div", { class: "t-title" }, x.rule), h("div", { class: "muted", style: "font-size:12.5px" }, x.message)),
+        h("td", { class: "mono" }, x.file + (x.line ? ":" + x.line : "")),
+        h("td", { class: "mono" }, x.component || "—"),
+        h("td", null, v ? h("span", { class: "status " + v[0], title: x.reason || "" }, v[1]) : h("span", { class: "muted" }, x.component ? "No verdict" : "Not scanned")),
+        h("td", null, iss ? h("span", { class: "link", onclick: () => openIssue(iss.id) }, sevc(iss.severity), " ", iss.id) : h("span", { class: "muted" }, "—"))); }))))
+    : h("div", { class: "empty" }, "No finding matches these filters.");
+  return [pageHead("Findings"),
+    h("div", { class: "callout", style: "margin-top:16px" }, "Raw results from other scanners, given to the agents as hints. An agent's verdict is an opinion; only an issue that passed the verification gate is proof."),
+    chips, h("div", { class: "card table-card" }, body)];
+}
+
+/* ---------- Policies (what this run was told) ---------- */
+function kvTable(rows) { return h("table", { class: "kvt" }, h("tbody", null, rows.map(([k, v]) => h("tr", null, h("td", null, k), h("td", null, v))))); }
+function policiesView() {
+  const p = S.plan && S.plan.policy;
+  if (!p) return [pageHead("Policies"), h("div", { class: "card table-card" }, h("div", { class: "empty" }, "This run has no policy snapshot (it predates the Policies view)."))];
+  const sc = p.scan, v = p.verification;
+  return [pageHead("Policies"),
+    h("div", { class: "widgets" },
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Scan limits"), h("div", { class: "sub" }, "per component unless noted"))),
+        h("div", { class: "card-b" }, kvTable([["Auth", sc.auth === "subscription" ? "Claude subscription" : "API key"], ["Model", h("code", null, sc.model)], ["Effort", sc.effort],
+          ["Agents in parallel", sc.concurrency], ["Max turns", sc.max_turns], ["Budget", "$" + sc.max_budget_usd + (sc.auth === "subscription" ? " (API-equivalent)" : "")],
+          ["Timeout", sc.timeout_minutes + " min"], ["Container", sc.memory + " · " + sc.cpus + " CPU"], ["Gateway request cap (run)", sc.max_requests]]))),
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Verification gate"), h("div", { class: "sub" }, "what makes a candidate an issue"))),
+        h("div", { class: "card-b" }, kvTable([["Proof on unpatched code", "required"], ["Patch must stop the proof", v.require_patch_differential ? "required" : "not required"],
+          ["Network in verification", "none"], ["Timeout per run", v.timeout_seconds + " s"], ["Reproducers in parallel", v.concurrency], ["Container", v.memory + " · " + v.cpus + " CPU"]]))),
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Scope"), h("div", { class: "sub" }, (p.components.explicit || []).length + " explicit components"))),
+        h("div", { class: "card-b" }, kvTable([["Workdir in image", h("code", null, p.workdir)], ["Diff base", h("code", null, p.diff_base)], ["Known issues", p.known_issues ? h("code", null, p.known_issues) : "—"],
+          ["Auto-split roots", (p.components.auto || []).map(a => a.root + " (depth " + a.depth + ")").join(", ") || "—"], ["Exclude patterns", p.components.exclude_count],
+          ["Seed files", (p.seeds || []).map(x => x.tool).join(", ") || "—"]])))),
+    (p.components.explicit || []).length ? h("div", { class: "card table-card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Explicit components"), h("div", { class: "sub" }, "scanned first, by priority"))),
+      h("div", { class: "table-wrap", style: "margin-top:8px" }, h("table", null, h("thead", null, h("tr", null, ["Component", "Priority", "Paths"].map(x => h("th", null, x)))),
+        h("tbody", null, [...p.components.explicit].sort((a, b) => b.priority - a.priority).map(e => h("tr", null, h("td", { class: "mono", style: "color:var(--text)" }, e.name), h("td", { class: "num" }, e.priority),
+          h("td", { class: "mono" }, e.paths.join("  ")))))))) : null,
+    h("div", { class: "card table-card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Threat model"), h("div", { class: "sub" }, p.threat_model_path || "none provided"))),
+      h("div", { class: "card-b" }, p.threat_model ? h("pre", { class: "tm" }, p.threat_model) : h("p", { class: "muted" }, "No threat model: agents use conventional severity."))),
+    S.plan.commands ? h("div", { class: "card table-card" }, h("div", { class: "card-b", style: "padding-top:14px" }, h("details", { class: "cmds" }, h("summary", null, "Docker commands for this run"),
+      h("pre", { style: "margin-top:10px;white-space:pre-wrap" }, Object.entries(S.plan.commands).map(([k, c]) => "# " + k + "\n" + (Array.isArray(c[0]) ? c.map(x => x.join(" ")).join("\n") : c.join(" "))).join("\n\n"))))) : null];
+}
+
 /* ---------- drawer ---------- */
 function evidenceBox(label, ev, wantProof) {
   if (!ev) return h("div", { class: "ev" }, h("div", { class: "h" }, label, h("span", { class: "status" }, "not run")));
@@ -896,8 +1067,16 @@ function renderDrawer() {
   else if (S.dtab === "evidence") body = [h("div", { class: "callout", style: "margin-bottom:14px" }, "Threadscan's own runs in fresh, offline containers, not the agent's account."),
     h("div", { class: "ev-grid" }, evidenceBox("Unpatched code", v.unpatched_run, true), evidenceBox("With the patch", v.patched_run, false)),
     (v.notes || []).length ? [h("h4", null, "Notes"), v.notes.map(n => h("p", null, n))] : null];
-  else if (S.dtab === "reproducer") body = [h("h4", null, "Script"), h("pre", null, repro.script || ""), (repro.files || []).map(rf => [h("div", { class: "file-label" }, rf.path), h("pre", null, rf.content)])];
-  else if (S.dtab === "remediation") body = [h("h4", null, "Proposed patch"), f.patch ? diffPre(f.patch) : h("p", null, "—")];
+  else if (S.dtab === "reproducer") body = [h("h4", null, "Script"),
+    h("div", { class: "copy-row" }, h("button", { class: "btn-ghost", type: "button", onclick: e => copyText(repro.script || "", e.currentTarget) }, icon("copy", "sm"), "Copy"),
+      h("button", { class: "btn-ghost", type: "button", onclick: () => download(f.id + "-reproducer.sh", repro.script || "", "text/x-shellscript") }, icon("download", "sm"), "Download .sh"),
+      h("span", { class: "muted", style: "font-size:12.5px" }, "Runs from the workdir with THREADSCAN_NONCE set; prints THREADSCAN-PROOF:<nonce> only when vulnerable.")),
+    h("pre", null, repro.script || ""), (repro.files || []).map(rf => [h("div", { class: "file-label" }, rf.path), h("pre", null, rf.content)])];
+  else if (S.dtab === "remediation") body = [h("h4", null, "Proposed patch"),
+    f.patch ? h("div", { class: "copy-row" }, h("button", { class: "btn-ghost", type: "button", onclick: e => copyText(f.patch, e.currentTarget) }, icon("copy", "sm"), "Copy"),
+      h("button", { class: "btn-ghost", type: "button", onclick: () => download(f.id + ".patch", f.patch, "text/x-diff") }, icon("download", "sm"), "Download .patch"),
+      h("span", { class: "muted", style: "font-size:12.5px" }, (f.verification || {}).patch_check === "fixed" ? "Verified: with this patch the reproducer no longer reproduces. Apply with git apply." : "Not verified by the gate.")) : null,
+    f.patch ? diffPre(f.patch) : h("p", null, "—")];
   else {
     const note = h("textarea", { class: "textarea", placeholder: "Add a note for this issue", maxlength: "4000", "aria-label": "Note" });
     note.value = t.note || "";
@@ -921,7 +1100,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") { if (S.menu) { closeMenu(); render(); } else if (S.selected) closeIssue(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.getElementById("q").focus(); }
 });
-document.getElementById("q").addEventListener("input", e => { S.q = e.target.value; if (!["issues", "components", "graph"].includes(S.view)) S.view = "issues"; render(); document.getElementById("q").focus(); });
+document.getElementById("q").addEventListener("input", e => { S.q = e.target.value; if (!["issues", "components", "graph", "findings"].includes(S.view)) S.view = "issues"; render(); document.getElementById("q").focus(); });
 
 /* ---------- render ---------- */
 function renderMainOnly() {
@@ -935,7 +1114,7 @@ function renderMainOnly() {
   const active = document.activeElement && document.activeElement.closest && document.activeElement.closest(".filters .search-pill") ? document.activeElement : null;
   const pos = active ? active.selectionStart : null;
   const v = S.view;
-  const nodes = v === "issues" ? issuesView() : v === "graph" ? graphView() : v === "components" ? componentsView() : v === "gate" ? gateView()
+  const nodes = v === "issues" ? issuesView() : v === "findings" ? findingsView() : v === "policies" ? policiesView() : v === "graph" ? graphView() : v === "components" ? componentsView() : v === "gate" ? gateView()
     : v === "trends" ? trendsView() : v === "compliance" ? complianceView() : overview();
   main.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   if (active) { const inp = main.querySelector(".filters .search-pill input"); if (inp) { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch (e) {} } }
@@ -945,12 +1124,14 @@ async function refresh() {
   clearTimeout(S.timer);
   try {
     S.runs = await getJSON("/api/runs");
+    notifyTransitions();
     if (!S.current && S.runs.length) S.current = S.runs[0].run_id;
     if (!S.owasp.length) S.owasp = await getJSON("/api/owasp");
     if (S.current) {
       const id = encodeURIComponent(S.current);
-      [S.st, S.findings, S.lc, S.triage] = await Promise.all([getJSON("/api/runs/" + id), getJSON("/api/runs/" + id + "/findings"), getJSON("/api/runs/" + id + "/lifecycle"),
-        getJSON("/api/triage").then(t => t.issues || {})]);
+      [S.st, S.findings, S.lc, S.triage, S.seeds, S.plan] = await Promise.all([getJSON("/api/runs/" + id), getJSON("/api/runs/" + id + "/findings"), getJSON("/api/runs/" + id + "/lifecycle"),
+        getJSON("/api/triage").then(t => t.issues || {}), getJSON("/api/runs/" + id + "/seeds").catch(() => ({ seeds: [], unassigned: 0 })),
+        getJSON("/api/runs/" + id + "/plan").catch(() => null)]);
       S.hist = S.st && S.st.project ? await getJSON("/api/projects/" + encodeURIComponent(S.st.project) + "/history").catch(() => []) : [];
     }
     if (!S.menu && !(document.activeElement && document.getElementById("drawer").contains(document.activeElement))) render();

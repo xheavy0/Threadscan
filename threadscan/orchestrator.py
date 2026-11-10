@@ -278,6 +278,26 @@ def lifecycle_phase(
     return lc
 
 
+def policy_snapshot(cfg: ProjectConfig) -> dict:
+    """What this run was told: shown read-only on the dashboard's Policies view."""
+    s, v = cfg.scan, cfg.verification
+    return {
+        "threat_model": cfg.threat_model_text,
+        "threat_model_path": str(cfg.threat_model) if cfg.threat_model else None,
+        "known_issues": cfg.known_issues,
+        "diff_base": cfg.diff_base,
+        "workdir": cfg.workdir,
+        "scan": {"auth": s.auth, "model": s.model, "effort": s.effort, "concurrency": s.concurrency, "max_turns": s.max_turns,
+                 "max_budget_usd": s.max_budget_usd, "timeout_minutes": s.timeout_minutes, "memory": s.memory, "cpus": s.cpus,
+                 "max_requests": s.max_requests},
+        "verification": {"require_patch_differential": v.require_patch_differential, "timeout_seconds": v.timeout_seconds,
+                         "concurrency": v.concurrency, "memory": v.memory, "cpus": v.cpus},
+        "components": {"explicit": [{"name": e.name, "priority": e.priority, "paths": e.paths} for e in cfg.components.explicit],
+                       "auto": [{"root": a.root, "depth": a.depth} for a in cfg.components.auto], "exclude_count": len(cfg.components.exclude)},
+        "seeds": [{"tool": sp.tool, "path": str(sp.path)} for sp in cfg.seeds],
+    }
+
+
 def lifecycle_counts(lc: dict | None) -> dict | None:
     if not lc:
         return None
@@ -314,7 +334,14 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                 seeds += load_seed_file(spec.tool, spec.path)
             else:
                 log(f"warning: seed file {spec.path} not found, skipped")
-        seeds_by_comp, _unassigned = assign_seeds(seeds, comps)
+        seeds_by_comp, unassigned_seeds = assign_seeds(seeds, comps)
+        seed_component = {s.id: name for name, lst in seeds_by_comp.items() for s in lst}
+
+        def write_seeds(verdicts: dict) -> None:
+            """Seeds with the component they were given to and the agent's verdict (if any)."""
+            rows = [{**s.to_dict(), "component": seed_component.get(s.id), "verdict": (verdicts.get(s.id) or {}).get("verdict"),
+                     "reason": (verdicts.get(s.id) or {}).get("reason")} for s in seeds]
+            write_json(run_dir / "seeds.json", {"seeds": rows, "unassigned": len(unassigned_seeds)})
         known = read_repo_file(repo, cfg.known_issues) if cfg.known_issues else None
 
         for c in comps:
@@ -327,7 +354,9 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
             "commit": head_commit(repo), "model": cfg.scan.model, "dry_run": opts.dry_run, "auth": cfg.scan.auth,
             "concurrency": cfg.scan.concurrency, "repo": str(repo) if not cfg.repo_is_url else cfg.repo,
         }
-        write_json(run_dir / "plan.json", {"meta": meta, "components": [c.to_dict() for c in comps], "seeds": len(seeds), "commands": _plan_commands(cfg, repo, run_dir, run_id, comps)})
+        write_json(run_dir / "plan.json", {"meta": meta, "policy": policy_snapshot(cfg), "components": [c.to_dict() for c in comps], "seeds": len(seeds),
+                                           "commands": _plan_commands(cfg, repo, run_dir, run_id, comps)})
+        write_seeds({})
 
         seeds_assigned = sum(len(v) for v in seeds_by_comp.values())
         if opts.dry_run:
@@ -405,6 +434,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
             dropped: list[Dropped] = []
             cands: list[Candidate] = []
             triage: dict[str, int] = {}
+            seed_verdicts: dict[str, dict] = {}
             for c in comps:
                 raw = raw_by_comp.get(c.name)
                 if raw is None or raw.get("structured") is None:
@@ -413,6 +443,8 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                 for t in structured.get("seed_triage") or []:
                     if isinstance(t, dict) and isinstance(t.get("verdict"), str):
                         triage[t["verdict"]] = triage.get(t["verdict"], 0) + 1
+                        if isinstance(t.get("seed_id"), str) and seed_component.get(t["seed_id"]) == c.name:
+                            seed_verdicts[t["seed_id"]] = {"verdict": t["verdict"], "reason": str(t.get("reason", ""))[:500]}
                 for item in structured.get("findings") or []:
                     cand, errs = validate_candidate(item, c.name)
                     if cand is None:
@@ -420,6 +452,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                         dropped.append(Dropped(c.name, "invalid_candidate", str(title)[:200], None, errs))
                     else:
                         cands.append(cand)
+            write_seeds(seed_verdicts)
             total_candidates = len(cands) + sum(1 for d in dropped if d.reason == "invalid_candidate")
             cands.sort(key=lambda x: (x.severity != "critical", x.severity != "high", x.component, x.file, x.line))
             cands, dups = dedupe(cands)

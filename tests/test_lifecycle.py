@@ -152,3 +152,32 @@ def test_lifecycle_never_calls_an_unverified_absence_resolved(cfg, tmp_path):
     assert "OWASP Top 10:2021: A07" in md
     hist = history.project_history(tmp_path / "runs", "demo")
     assert [r["verified"] for r in hist] == [4, 3] and hist[-1]["resolved"] == 1 and hist[-1]["new"] == 1
+
+
+def test_seeds_and_policy_are_recorded(cfg, tmp_path):
+    sarif = tmp_path / "c.sarif"
+    sarif.write_text(json.dumps({"runs": [{"tool": {"driver": {"name": "CodeQL"}}, "results": [
+        {"ruleId": "java/missing-auth", "message": {"text": "m"}, "locations": [{"physicalLocation": {"artifactLocation": {"uri": "backend/src/main/java/com/x/auth/Login.java"}, "region": {"startLine": 1}}}]},
+        {"ruleId": "js/elsewhere", "message": {"text": "n"}, "locations": [{"physicalLocation": {"artifactLocation": {"uri": "not/in/repo.js"}, "region": {"startLine": 2}}}]},
+    ]}]}))
+    from threadscan.config import SeedSpec
+    from threadscan.seeds import load_seed_file
+
+    seed_id = load_seed_file("codeql", sarif)[0].id
+
+    class B(FakeBackend):
+        def scan_component(self, comp, task_dir, out_dir):
+            write_json(out_dir / "candidates.json", {"structured": {"findings": [raw_candidate(seed_ids=[seed_id])],
+                       "seed_triage": [{"seed_id": seed_id, "verdict": "true_positive", "reason": "reachable"}, {"seed_id": "forged", "verdict": "false_positive", "reason": "x"}],
+                       "notes": ""}, "result": {}})
+
+    run_dir = run_scan(cfg, ScanOptions(mode="full", runs_dir=tmp_path / "runs", extra_seeds=[SeedSpec("codeql", sarif)]), backend=B({}), log=lambda *_: None)
+    seeds = json.loads((run_dir / "seeds.json").read_text())
+    by_rule = {s["rule"]: s for s in seeds["seeds"]}
+    assert by_rule["java/missing-auth"]["component"] == AUTH and by_rule["java/missing-auth"]["verdict"] == "true_positive"
+    assert by_rule["js/elsewhere"]["component"] is None and by_rule["js/elsewhere"]["verdict"] is None
+    assert seeds["unassigned"] == 1
+    assert all(s["id"] != "forged" for s in seeds["seeds"])  # verdicts only for seeds the component was given
+    plan = json.loads((run_dir / "plan.json").read_text())
+    assert plan["policy"]["scan"]["concurrency"] == cfg.scan.concurrency and "threat_model" in plan["policy"]
+    assert plan["policy"]["verification"]["require_patch_differential"] is True

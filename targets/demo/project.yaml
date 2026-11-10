@@ -1,0 +1,39 @@
+# Threadscan end-to-end test target: a tiny, intentionally vulnerable app in this repo
+# (examples/vulnapp). Builds in under a minute and needs one component, so a real run
+# costs little. Use it to prove the pipeline before scanning Aegis:
+#
+#   threadscan scan targets/demo --full --max-components 1 --dashboard
+#
+# It is not a git repository of its own, so use --full (diff mode needs git history).
+
+name: demo
+repo: ../../examples/vulnapp
+dockerfile: Dockerfile
+workdir: /src
+threat_model: threat_model.md
+
+components:
+  exclude:
+    - "tests/**"
+    - "**/*.md"
+  explicit:
+    - name: server
+      priority: 10
+      description: the HTTP handler, file serving and admin endpoints
+      paths: ["app.py", "public/**", "secret.txt"]
+  leftover: null
+
+scan:
+  auth: subscription
+  effort: medium
+  max_turns: 40
+  max_budget_usd: 2.0
+  timeout_minutes: 20
+  memory: 2g
+  cpus: 1
+  max_requests: 300
+
+verification:
+  timeout_seconds: 120
+  memory: 1g
+  cpus: 1

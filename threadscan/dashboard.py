@@ -104,6 +104,17 @@ def run_lifecycle(run_dir: Path) -> dict:
     return _load(run_dir / "lifecycle.json") or {}
 
 
+def run_seeds(run_dir: Path) -> dict:
+    return _load(run_dir / "seeds.json") or {"seeds": [], "unassigned": 0}
+
+
+def run_plan(run_dir: Path) -> dict:
+    """The run's policy snapshot and planned docker commands. The commands hold local paths
+    (this is a local page) and never secrets: credentials are passed to docker by name."""
+    plan = _load(run_dir / "plan.json") or {}
+    return {k: plan.get(k) for k in ("meta", "policy", "components", "seeds", "commands")}
+
+
 def make_handler(runs_dir: Path, port: int):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
     allowed_origins = {f"http://{h}" for h in allowed_hosts}
@@ -150,7 +161,7 @@ def make_handler(runs_dir: Path, port: int):
                 if not PROJECT_RE.match(m.group(1)):
                     return self._json({"error": "unknown project"}, 404)
                 return self._json(history.project_history(runs_dir, m.group(1)))
-            m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report|lifecycle))?$", path)
+            m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report|lifecycle|seeds|plan))?$", path)
             if m:
                 d = run_dir_for(runs_dir, m.group(1))
                 if d is None:
@@ -159,6 +170,10 @@ def make_handler(runs_dir: Path, port: int):
                     return self._json(run_findings(d))
                 if m.group(2) == "lifecycle":
                     return self._json(run_lifecycle(d))
+                if m.group(2) == "seeds":
+                    return self._json(run_seeds(d))
+                if m.group(2) == "plan":
+                    return self._json(run_plan(d))
                 if m.group(2) == "report":
                     rp = d / "report.md"
                     text = rp.read_text(encoding="utf-8") if rp.is_file() else ""

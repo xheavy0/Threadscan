@@ -103,6 +103,20 @@ def cmd_dashboard(a) -> int:
     return 0
 
 
+def cmd_doctor(a) -> int:
+    from threadscan.doctor import render, run_doctor
+
+    cfg = load_project(a.target, a.repo) if a.target else None
+    auth = a.auth or (cfg.scan.auth if cfg else "subscription")
+    print(f"threadscan doctor: auth={auth}" + (f", target={cfg.name}" if cfg else "") + (", live checks on (uses a few cents of usage)" if a.live else ""))
+    if a.live:
+        print("building a small scan image and running one tiny agent; this takes a few minutes the first time")
+    report, run_dir = run_doctor(cfg, auth, a.live, a.model, Path(a.runs_dir))
+    print(render(report))
+    print(f"details: {run_dir}")
+    return 1 if report.failed else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="threadscan", description="AI vulnerability scanner with a verification gate")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -137,6 +151,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_dashboard)
+
+    p = sub.add_parser("doctor", help="check this machine is ready to scan; --live runs a cheap end-to-end test")
+    p.add_argument("target", type=Path, nargs="?", help="optional target config dir, e.g. targets/aegis")
+    p.add_argument("--repo", help="override project.yaml repo")
+    p.add_argument("--live", action="store_true", help="also start the gateway, build a small scan image and run one tiny agent")
+    p.add_argument("--auth", choices=AUTH_MODES, help="default: the target's scan.auth, else subscription")
+    p.add_argument("--model", default="claude-haiku-5-5", help="model for the live agent check (default: claude-haiku-5-5, the cheapest)")
+    p.add_argument("--runs-dir", default="runs")
+    p.set_defaults(fn=cmd_doctor)
     return ap
 
 

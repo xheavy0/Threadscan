@@ -33,8 +33,10 @@ Diff mode (only components touched since a git ref) is the default; a full scan 
 | Aegis scan image (`targets/aegis/Dockerfile`) | Written, **not yet built** |
 | Subscription mode (`auth: subscription`) | Implemented and unit-tested, **not yet run against the real API**: whether Claude Code sends its OAuth token through `ANTHROPIC_BASE_URL` is unconfirmed |
 
-Expect the first real run to need small fixes in those last three rows. Run it on one
-component first (`--max-components 1`).
+Expect the first real run to need small fixes in those last three rows. Follow
+[LAB-TEST.md](LAB-TEST.md): `threadscan doctor --live` first (it exercises the gateway, the
+token, Claude Code and the verification driver for a few cents), then the small demo target,
+then one Aegis component.
 
 ## Setup
 
@@ -88,6 +90,9 @@ export ANTHROPIC_API_KEY="<key>"          # bash
 ## Usage
 
 ```bash
+threadscan doctor targets/aegis                           # is this machine ready? (free)
+threadscan doctor targets/aegis --live                    # end-to-end smoke test (a few cents)
+threadscan scan targets/demo --full --max-components 1    # cheap real run on the demo app
 threadscan validate targets/aegis                         # check the config
 threadscan components targets/aegis                       # what diff mode would scan
 threadscan components targets/aegis --full                # all components
@@ -102,6 +107,24 @@ threadscan dashboard                                      # http://127.0.0.1:876
 Useful flags: `--only NAME` (repeatable) scans named components; `--repo PATH|URL`
 overrides `project.yaml`; `--runs-dir` changes where output goes (default `runs/`, which
 is gitignored).
+
+### Doctor
+
+`threadscan doctor [target]` checks Python, git, Docker (Linux engine, memory, BuildKit),
+free disk, the credential for the auth mode (set or not, and whether it looks like the right
+kind; the value is never printed), the target config and repo, and that Docker can create an
+internal network. `--live` also starts the gateway, probes it from the internal network,
+checks that the internal network cannot reach the internet, builds a small scan image with
+the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by default,
+`--model` to change), and runs the verification driver offline. Results are printed and
+saved to `runs/doctor-<time>/doctor.json`.
+
+### Demo target
+
+`targets/demo` scans `examples/vulnapp`, a tiny standard-library web app with two planted
+bugs (a path traversal in `/files`, and `/admin/export` without the admin token check). It
+builds in under a minute and is one component, so a real run is cheap. It is not a git repo
+of its own: use `--full`.
 
 ### Dashboard
 
@@ -130,6 +153,15 @@ used. All of it is self-hosted, so the page works offline and loads nothing from
 - **Trends:** verified issues per run by severity, and new / resolved / re-verified per run.
 - **Compliance:** OWASP Top 10:2021 categories, mapped from each issue's CWE. A category
   without verified issues says "No verified issues", never "passed".
+- **Findings:** the CodeQL / gitleaks / OSV seeds, with the component they were given to,
+  the agent's verdict, and a link to the verified issue they led to. A verdict is the agent's
+  opinion; only the linked issue is proof.
+- **Policies:** what the run was told: scan limits, gate rules, scope, explicit components,
+  the full threat model and the docker commands.
+- **Notifications:** the bell lists run events on this machine (finished, failed, stopped
+  at the usage limit, running), with optional desktop alerts when a run finishes.
+- **Saved views** (Issues → Views) keep filter, group and search combinations per browser.
+- The issue drawer can copy or download the reproducer (`.sh`) and the patch (`.patch`).
 
 **Triage.** Status (Open, In progress, Resolved, Risk accepted, False positive), assignee and
 a note per issue are stored in `runs/triage.json`, keyed by issue id, so they follow an issue
@@ -313,11 +345,12 @@ Residual risks to keep in mind:
 | File | Content |
 |---|---|
 | `status.json` | live phase and per-component state (the dashboard reads it) |
-| `plan.json` | selected components and the exact docker commands |
+| `plan.json` | selected components, the policy snapshot (limits, gate rules, threat model) and the exact docker commands |
 | `components/<slug>/task.json` | prompts, threat model, file list, diff, seeds given to that agent |
 | `components/<slug>/out/` | `progress.json`, `transcript.jsonl`, `candidates.json` from the agent |
 | `verify/<id>/` | gate inputs, container logs, `verdict.json` |
 | `findings/<id>.json`, `findings.json` | verified findings only (with OWASP category; carried-over ones marked) |
+| `seeds.json` | seed findings with their component and the agent's verdict |
 | `lifecycle.json` | new, existing, resolved (re-checked), re-verified, unverified and not-rescanned issues vs the previous run |
 | `dropped.json` | unproven candidates with reasons (scanner debugging, not findings) |
 | `report.md` | the human-readable report |

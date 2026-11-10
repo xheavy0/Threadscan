@@ -159,3 +159,13 @@ def test_triage_writes_need_same_origin_json_and_the_custom_header(runs):
         assert (runs / "triage.json").is_file()
     finally:
         srv.shutdown()
+
+
+def test_dashboard_seeds_and_plan_endpoints(runs):
+    run = runs / "20260101-000000-demo"
+    write_json(run / "seeds.json", {"seeds": [{"id": "codeql-1", "tool": "codeql", "rule": "r", "file": "a", "line": 1, "verdict": "unsure"}], "unassigned": 0})
+    write_json(run / "plan.json", {"meta": {}, "policy": {"scan": {"auth": "subscription"}}, "components": [], "seeds": 1, "commands": {}, "extra": "dropped"})
+    assert dashboard.run_seeds(run)["seeds"][0]["verdict"] == "unsure"
+    plan = dashboard.run_plan(run)
+    assert plan["policy"]["scan"]["auth"] == "subscription" and "extra" not in plan
+    assert dashboard.run_seeds(runs)["seeds"] == []  # missing file -> empty, not an error
