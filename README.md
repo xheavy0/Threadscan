@@ -105,24 +105,35 @@ is gitignored).
 
 ### Dashboard
 
-`threadscan dashboard` (or `scan --dashboard`) serves a read-only page on
-`http://127.0.0.1:8765/`, laid out like a cloud-security console: navy side navigation
-with the runs, a light work area, and four views.
+`threadscan dashboard` (or `scan --dashboard`) serves a local page on
+`http://127.0.0.1:8765/`. Its design follows Wiz's product UI: a white icon rail with
+labels, a white top bar with a run selector and a search pill (Ctrl K), rounded filter pills
+that turn blue when active, a GROUP BY control, round letter severity badges (C/H/M/L),
+pill statuses and a dotted-canvas graph. Type is DM Sans and Poppins, the open fonts Wiz
+uses, plus JetBrains Mono; icons are Lucide (ISC). Wiz's own icon set and logo are not
+used. All of it is self-hosted, so the page works offline and loads nothing from another host.
 
-- **Overview:** KPI cards (verified issues with a severity bar, components scanned,
-  candidates, cost or subscription usage), the plan → build → scan → verify → report
-  pipeline, the usage-limit banner with the resume command, top issues, issues by
-  severity, the verification funnel.
-- **Issues:** the verified issues table with severity filter pills and search. Clicking a
-  row opens a detail drawer with Overview, Evidence (the gate's own runs), Reproducer and
-  Remediation (the patch) tabs.
-- **Components:** per-component state with live agent activity.
-- **Verification gate:** every candidate's result and the drop reasons.
+- **Boards:** open issues by severity, verified issues over time with the change since the
+  last run, what changed since the last scan (new, resolved, unverified), the plan → build
+  → scan → verify → report steps, the usage-limit banner with the resume command, the
+  verification funnel, top components and cost or subscription usage.
+- **Issues:** filter pills (severity, status, lifecycle, component, OWASP), search, GROUP BY
+  (component, OWASP, severity, status), and CSV/JSON export of the filtered list (cells
+  that could run as spreadsheet formulas are escaped). A row opens the issue drawer.
+- **Issue drawer:** status and assignee at the top; tabs Overview, Graph (component → file →
+  issue → OWASP, with the gate's proof and the verified fix), Evidence (the gate's own
+  runs), Reproducer, Remediation (the patch) and Activity (note and change history).
+- **Graph:** a security graph of open issues linked to their components and OWASP
+  categories; the Issues filters apply.
+- **Inventory:** components with status, issue counts and live agent activity.
+- **Gate:** every candidate with its gate result, quick filters and drop reasons.
+- **Trends:** verified issues per run by severity, and new / resolved / re-verified per run.
+- **Compliance:** OWASP Top 10:2021 categories, mapped from each issue's CWE. A category
+  without verified issues says "No verified issues", never "passed".
 
-It refreshes every 2 s while a run is live, and follows the system light/dark setting
-(toggle at the bottom of the navigation). Inter and JetBrains Mono are self-hosted under
-`threadscan/static/fonts/` (SIL OFL), so the page works offline and never calls a font
-CDN. Mark and accent: [docs/branding.md](docs/branding.md).
+**Triage.** Status (Open, In progress, Resolved, Risk accepted, False positive), assignee and
+a note per issue are stored in `runs/triage.json`, keyed by issue id, so they follow an issue
+across runs. Resolved, risk-accepted and false-positive issues leave the open counts.
 
 ## How it works
 
@@ -158,6 +169,22 @@ Every file that survives `include`/`exclude` goes to the first matching **explic
 component; otherwise to the deepest **auto** root containing it, split `depth`
 directories below that root; otherwise to the `leftover` component. Explicit components
 carry a `priority`, so `--max-components N` takes the most security-relevant ones first.
+
+### Lifecycle across runs
+
+Each run is compared with the previous completed run of the same target. Issues are
+matched by id, or by the same file and CWE within ten lines (agents reword titles). New
+issues are tagged New. An issue from the previous run that is not reported again, in a
+component that was scanned again, is **not** assumed fixed: Threadscan re-runs its old
+reproducer on the new code first.
+
+- No proof line, exit 0: **resolved**, with the run as evidence.
+- Proof line still printed: **re-verified**. The issue is carried into this run's findings
+  with fresh evidence, because the agent missed it but it is still there.
+- The reproducer cannot run: **unverified**, listed in the report, never counted as resolved.
+
+Issues in components the run did not scan keep their last state. The result is
+`lifecycle.json` and a "Changes since" section in the report.
 
 ### The reproducer contract and the gate
 
@@ -250,11 +277,14 @@ What the scanner protects, and how:
 - **Secrets are scrubbed from output.** Everything written to `runs/` or served by the
   dashboard passes a redactor (the live API key value, `sk-ant-`, GitHub, AWS, Slack tokens,
   private keys). gitleaks seeds are loaded without their `Secret`/`Match` fields.
-- **The dashboard is local and read-only.** It binds to 127.0.0.1, checks the `Host` header
-  (DNS rebinding), serves only files it names inside `runs/<run-id>/` plus a fixed list of
-  its own fonts and mark, loads nothing from other hosts, sends a strict CSP and renders all
-  data as text.
-- **Reports stay private.** `runs/` and `targets/*/seeds/` are gitignored.
+- **The dashboard is local.** It binds to 127.0.0.1 and checks the `Host` header (DNS
+  rebinding). It reads only files it names inside `runs/<run-id>/` plus a fixed list of its own
+  fonts and its mark (icons are inline SVG); it loads nothing from other hosts, sends a strict CSP and
+  renders all data as text. Its one write is triage state in `runs/triage.json`, accepted
+  only as a JSON POST carrying the `X-Threadscan-Request` header, with no foreign `Origin`.
+  A page on another site cannot add that header without a CORS preflight, which the server
+  never answers. Ids, statuses and field lengths are validated.
+- **Reports stay private.** `runs/` (including `triage.json`) and `targets/*/seeds/` are gitignored.
 
 Residual risks to keep in mind:
 
@@ -287,10 +317,11 @@ Residual risks to keep in mind:
 | `components/<slug>/task.json` | prompts, threat model, file list, diff, seeds given to that agent |
 | `components/<slug>/out/` | `progress.json`, `transcript.jsonl`, `candidates.json` from the agent |
 | `verify/<id>/` | gate inputs, container logs, `verdict.json` |
-| `findings/<id>.json`, `findings.json` | verified findings only |
+| `findings/<id>.json`, `findings.json` | verified findings only (with OWASP category; carried-over ones marked) |
+| `lifecycle.json` | new, existing, resolved (re-checked), re-verified, unverified and not-rescanned issues vs the previous run |
 | `dropped.json` | unproven candidates with reasons (scanner debugging, not findings) |
 | `report.md` | the human-readable report |
-| `summary.json` | components scanned, candidates, verified, dropped, seeds, tokens, cost, gateway stats |
+| `summary.json` | components scanned, candidates, verified, dropped, lifecycle counts, seeds, tokens, cost, gateway stats |
 
 ## Adding a target
 

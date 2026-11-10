@@ -20,7 +20,8 @@ from threadscan.repo import changed_files, diff_text, head_commit, list_files, r
 from threadscan.report import Dropped, build_summary, finding_dict, write_outputs
 from threadscan.seeds import Seed, assign_seeds, load_seed_file
 from threadscan.status import StatusTracker, write_json
-from threadscan.verify import Executor, Policy, RunResult, Verifier
+from threadscan import history
+from threadscan.verify import DROP_REASONS, Executor, Policy, RunResult, Verdict, Verifier, classify_unpatched, new_nonce
 
 PKG_DIR = Path(__file__).resolve().parent
 DOCKER_DIR = PKG_DIR.parent / "docker"
@@ -225,6 +226,64 @@ def check_full_scan_guard(cfg: ProjectConfig, opts: ScanOptions) -> None:
             )
 
 
+def lifecycle_phase(
+    cfg: ProjectConfig, runs_dir: Path, run_id: str, run_dir: Path, findings: list[dict], results: list[dict], executor_factory, status, log
+) -> dict:
+    """Compare with the previous completed run. Never infer "resolved" from absence: re-run the
+    old reproducer on the current code first (see threadscan/history.py)."""
+    prev = history.previous_run(runs_dir, cfg.name, run_id)
+    if prev is None:
+        lc = {"previous_run": None, "new": [f["id"] for f in findings], "existing": {}, "resolved": [],
+              "still_present": [], "unverified": [], "not_rescanned": []}
+        write_json(run_dir / "lifecycle.json", lc)
+        return lc
+    scanned = {r["name"] for r in results if r["state"] == "done"}
+    lp = history.plan(prev["run_id"], prev["findings"], findings, scanned)
+    resolved, still, unverified = [], [], []
+    if lp.recheck:
+        status.phase("verifying", f"re-checking {len(lp.recheck)} issues from {prev['run_id']} that were not reported again")
+        executor = executor_factory()
+        for f in lp.recheck:
+            try:
+                cand = history.candidate_from_finding(f)
+            except (KeyError, TypeError):
+                unverified.append({**history.brief(f), "reason": "the previous finding record is incomplete"})
+                continue
+            nonce = new_nonce()
+            try:
+                rr = executor.run(cand, "unpatched", nonce)
+            except Exception as exc:  # a re-check must never crash the run
+                rr = RunResult(None, "", "", 0.0, infra_error=f"{type(exc).__name__}: {exc}")
+            state = classify_unpatched(rr, nonce)
+            ev = rr.evidence(nonce)
+            if state == "reproduced":
+                note = f"carried over from {prev['run_id']}: not reported again by the agent, but its reproducer still demonstrates the issue"
+                v = Verdict(cand.id, True, "verified", True, "not_rerun", unpatched=ev, notes=[note])
+                fd = finding_dict(cand, v)
+                fd["verification"]["status"] = "re-verified"
+                fd["carried_over_from"] = prev["run_id"]
+                findings.append(fd)
+                still.append(cand.id)
+                log(f"[still present] {cand.title}")
+            elif state == "not_reproduced":
+                resolved.append({**history.brief(f), "evidence": ev})
+                log(f"[resolved] {f['title']}")
+            else:
+                unverified.append({**history.brief(f), "reason": DROP_REASONS.get(state, state), "evidence": ev})
+    lc = {
+        "previous_run": prev["run_id"], "new": lp.new, "existing": lp.matches, "resolved": resolved,
+        "still_present": still, "unverified": unverified, "not_rescanned": [history.brief(f) for f in lp.not_rescanned],
+    }
+    write_json(run_dir / "lifecycle.json", lc)
+    return lc
+
+
+def lifecycle_counts(lc: dict | None) -> dict | None:
+    if not lc:
+        return None
+    return {"previous_run": lc.get("previous_run"), **{k: len(lc.get(k) or []) for k in ("new", "existing", "resolved", "still_present", "unverified", "not_rescanned")}}
+
+
 def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = None, log=print) -> Path:
     if opts.auth:
         cfg.scan.auth = opts.auth
@@ -387,6 +446,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                 else:
                     dropped.append(Dropped(cand.component, v.reason, cand.title, cand.id, v.notes))
             skipped = [r["name"] for r in results if r["state"] == "skipped"]
+            lifecycle = lifecycle_phase(cfg, opts.runs_dir.resolve(), run_id, run_dir, findings, results, lambda: backend.executor(run_dir), status, log)
             for r in results:
                 if r["state"] == "error":
                     dropped.append(Dropped(r["name"], "agent_error", "", None, [r["error"] or ""]))
@@ -404,10 +464,11 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
         summary = build_summary(len(comps), results, total_candidates, findings, cand_dropped, len(seeds), seeds_assigned, triage, gw)
         summary["agent_errors"] = by_reason.get("agent_error", 0)
         summary["components_skipped"] = skipped
+        summary["lifecycle"] = lifecycle_counts(lifecycle)
         summary["limit_reached"] = bool(skipped) or bool(gw and gw.get("limit_hit_at"))
         if skipped:
             summary["resume_command"] = resume_command(cfg, opts.mode, base, skipped)
-        write_outputs(run_dir, meta, findings, dropped, summary)
+        write_outputs(run_dir, meta, findings, dropped, summary, lifecycle)
         status.counts(verified=len(findings), dropped=len(cand_dropped), by_reason={k: v for k, v in by_reason.items() if k != "agent_error"})
         done_msg = f"{len(findings)} verified, {len(cand_dropped)} dropped"
         if skipped:

@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from threadscan.candidates import SEVERITY_RANK, Candidate
+from threadscan.owasp import categorize
 from threadscan.status import write_json
 from threadscan.verify import DROP_REASONS, Verdict
 
@@ -37,6 +38,7 @@ def finding_dict(c: Candidate, v: Verdict) -> dict:
         "severity": c.severity,
         "severity_rationale": c.severity_rationale,
         "cwe": c.cwe,
+        "owasp": categorize(c.cwe),
         "component": c.component,
         "file": c.file,
         "line": c.line,
@@ -91,7 +93,25 @@ def _run_evidence(label: str, ev: dict | None) -> list[str]:
     return lines
 
 
-def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
+def _lifecycle_md(lc: dict | None) -> list[str]:
+    if not lc or not lc.get("previous_run"):
+        return []
+    out = [f"## Changes since `{lc['previous_run']}`", ""]
+    out.append(f"- New: {len(lc.get('new') or [])}")
+    out.append(f"- Still present (reported again or re-verified): {len(lc.get('existing') or {}) + len(lc.get('still_present') or [])}")
+    out.append(f"- Resolved (the old reproducer no longer reproduces on this code): {len(lc.get('resolved') or [])}")
+    for r in lc.get("resolved") or []:
+        out.append(f"  - [{r['severity'].upper()}] {r['title']} (`{r['location']}`)")
+    if lc.get("unverified"):
+        out.append(f"- Not reported again and could not be re-checked: {len(lc['unverified'])} (not counted as resolved)")
+        for r in lc["unverified"]:
+            out.append(f"  - [{r['severity'].upper()}] {r['title']}: {r.get('reason')}")
+    if lc.get("not_rescanned"):
+        out.append(f"- In components this run did not scan: {len(lc['not_rescanned'])}")
+    return out + [""]
+
+
+def render_markdown(meta: dict, findings: list[dict], summary: dict, lifecycle: dict | None = None) -> str:
     out = [f"# threadscan report: {meta['project']}", ""]
     mode = "full scan" if meta["mode"] == "full" else f"diff scan since `{meta.get('base')}`"
     out += [
@@ -118,7 +138,8 @@ def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
     if summary["by_severity"]:
         out += ["", "By severity: " + ", ".join(f"{k} {v}" for k, v in summary["by_severity"].items())]
 
-    out += ["", "## Findings", ""]
+    out += [""] + _lifecycle_md(lifecycle)
+    out += ["## Findings", ""]
     if not findings:
         out += ["No verified findings in this run." if not meta.get("dry_run") else "None: this was a dry run.", ""]
     for f in findings:
@@ -130,8 +151,11 @@ def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
             f"- Component: `{f['component']}`",
             f"- Location: `{f['location']}`",
             f"- CWE: {f['cwe'] or 'n/a'}",
+            f"- OWASP Top 10:2021: {f['owasp']['id']} {f['owasp']['name']}" if f.get("owasp") else "- OWASP Top 10:2021: not mapped",
             f"- Severity rationale: {f['severity_rationale'] or 'n/a'}",
         ]
+        if f.get("carried_over_from"):
+            out.append(f"- Carried over from `{f['carried_over_from']}`: not reported again, but its reproducer still works")
         if f["seed_ids"]:
             out.append(f"- Seeds: {', '.join('`' + s + '`' for s in f['seed_ids'])}")
         out += ["", f["description"], "", f"**Impact.** {f['impact']}", "", "**Reproducer**", "", _fence(f["reproducer"]["script"], "bash")]
@@ -206,7 +230,7 @@ def build_summary(
     }
 
 
-def write_outputs(run_dir: Path, meta: dict, findings: list[dict], dropped: list[Dropped], summary: dict) -> Path:
+def write_outputs(run_dir: Path, meta: dict, findings: list[dict], dropped: list[Dropped], summary: dict, lifecycle: dict | None = None) -> Path:
     findings = sorted(findings, key=lambda f: (SEVERITY_RANK[f["severity"]], f["component"], f["file"], f["line"]))
     fdir = run_dir / "findings"
     fdir.mkdir(parents=True, exist_ok=True)
@@ -218,5 +242,5 @@ def write_outputs(run_dir: Path, meta: dict, findings: list[dict], dropped: list
     report = run_dir / "report.md"
     from threadscan.redact import redact
 
-    report.write_text(redact(render_markdown(meta, findings, summary)), encoding="utf-8")
+    report.write_text(redact(render_markdown(meta, findings, summary, lifecycle)), encoding="utf-8")
     return report

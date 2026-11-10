@@ -1,9 +1,12 @@
-"""Local, read-only dashboard: scan progress and verified findings.
+"""Local dashboard: scan progress, verified issues, trends, compliance and triage.
 
 ``threadscan dashboard`` serves ``dashboard.html`` and a small JSON API over the runs
-directory. It binds to 127.0.0.1 only, checks the Host header (so a web page cannot
-reach it through DNS rebinding), serves nothing but files inside ``runs/<run-id>/``
-that it names itself, and never writes.
+directory. It binds to 127.0.0.1 only and checks the Host header (so a web page cannot
+reach it through DNS rebinding). It reads only files it names inside ``runs/<run-id>/``.
+Its one write is triage state (``runs/triage.json``), accepted only as a JSON POST that
+carries the ``X-Threadscan-Request`` header from the dashboard's own origin: a page on
+another site cannot send that header without a CORS preflight, which this server never
+answers.
 """
 
 from __future__ import annotations
@@ -14,16 +17,23 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+from threadscan import history
+from threadscan.owasp import categories, categorize
 from threadscan.redact import redact_obj
+from threadscan.triage import STATUSES, TriageError, TriageStore
 
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}$")
+PROJECT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 HTML_PATH = Path(__file__).resolve().parent / "dashboard.html"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 # The only static files served, by exact name: self-hosted fonts (no font CDN) and the mark.
 STATIC_FILES = {
     "/static/threadscan.svg": ("threadscan.svg", "image/svg+xml"),
     "/favicon.svg": ("threadscan.svg", "image/svg+xml"),
-    "/static/fonts/inter.woff2": ("fonts/inter-latin-wght-normal.woff2", "font/woff2"),
+    "/static/fonts/dm-sans.woff2": ("fonts/dm-sans-latin-wght-normal.woff2", "font/woff2"),
+    "/static/fonts/poppins-400.woff2": ("fonts/poppins-latin-400-normal.woff2", "font/woff2"),
+    "/static/fonts/poppins-500.woff2": ("fonts/poppins-latin-500-normal.woff2", "font/woff2"),
+    "/static/fonts/poppins-600.woff2": ("fonts/poppins-latin-600-normal.woff2", "font/woff2"),
     "/static/fonts/jetbrains-mono-400.woff2": ("fonts/jetbrains-mono-latin-400-normal.woff2", "font/woff2"),
     "/static/fonts/jetbrains-mono-500.woff2": ("fonts/jetbrains-mono-latin-500-normal.woff2", "font/woff2"),
 }
@@ -31,6 +41,8 @@ CSP = (
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self'; "
     "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
+CSRF_HEADER = "x-threadscan-request"
+MAX_POST = 16 * 1024
 
 
 def _load(path: Path):
@@ -48,7 +60,7 @@ def list_runs(runs_dir: Path) -> list[dict]:
         st = _load(d / "status.json") if d.is_dir() and RUN_ID_RE.match(d.name) else None
         if not st:
             continue
-        out.append({k: st.get(k) for k in ("run_id", "project", "mode", "base", "dry_run", "phase", "started", "updated", "finished", "counts", "message")})
+        out.append({k: st.get(k) for k in ("run_id", "project", "mode", "base", "dry_run", "phase", "started", "updated", "finished", "counts", "message", "auth")})
     out.sort(key=lambda r: r.get("started") or 0, reverse=True)
     return out
 
@@ -71,16 +83,31 @@ def run_status(run_dir: Path) -> dict:
                 c["progress"] = {k: prog.get(k) for k in ("turns", "tool_calls", "last", "updated", "state")}
     summary = _load(run_dir / "summary.json")
     if summary:
-        st["summary"] = {k: summary.get(k) for k in ("components_scanned", "components_failed", "candidates", "verified", "dropped", "dropped_by_reason", "by_severity", "tokens", "cost_usd", "seeds", "components_skipped", "limit_reached", "resume_command")}
+        st["summary"] = {k: summary.get(k) for k in (
+            "components_scanned", "components_failed", "candidates", "verified", "dropped", "dropped_by_reason",
+            "by_severity", "tokens", "cost_usd", "seeds", "components_skipped", "limit_reached", "resume_command", "lifecycle",
+        )}
     return st
 
 
 def run_findings(run_dir: Path) -> list:
-    return _load(run_dir / "findings.json") or []
+    """Findings with their OWASP Top 10:2021 category added (older runs lack the field)."""
+    out = []
+    for f in _load(run_dir / "findings.json") or []:
+        if "owasp" not in f:
+            f["owasp"] = categorize(f.get("cwe"))
+        out.append(f)
+    return out
+
+
+def run_lifecycle(run_dir: Path) -> dict:
+    return _load(run_dir / "lifecycle.json") or {}
 
 
 def make_handler(runs_dir: Path, port: int):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+    allowed_origins = {f"http://{h}" for h in allowed_hosts}
+    triage = TriageStore(runs_dir / "triage.json")
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "threadscan-dashboard"
@@ -114,19 +141,57 @@ def make_handler(runs_dir: Path, port: int):
                 return self._send(200, (STATIC_DIR / name).read_bytes(), ctype, "public, max-age=86400")
             if path == "/api/runs":
                 return self._json(list_runs(runs_dir))
-            m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report))?$", path)
+            if path == "/api/triage":
+                return self._json({"statuses": STATUSES, "issues": triage.load()})
+            if path == "/api/owasp":
+                return self._json(categories())
+            m = re.match(r"^/api/projects/([^/]+)/history$", path)
+            if m:
+                if not PROJECT_RE.match(m.group(1)):
+                    return self._json({"error": "unknown project"}, 404)
+                return self._json(history.project_history(runs_dir, m.group(1)))
+            m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report|lifecycle))?$", path)
             if m:
                 d = run_dir_for(runs_dir, m.group(1))
                 if d is None:
                     return self._json({"error": "unknown run"}, 404)
                 if m.group(2) == "findings":
                     return self._json(run_findings(d))
+                if m.group(2) == "lifecycle":
+                    return self._json(run_lifecycle(d))
                 if m.group(2) == "report":
                     rp = d / "report.md"
                     text = rp.read_text(encoding="utf-8") if rp.is_file() else ""
                     return self._send(200, text.encode("utf-8"), "text/plain; charset=utf-8")
                 return self._json(run_status(d))
             return self._send(404, b"not found", "text/plain")
+
+        def do_POST(self):
+            if self.headers.get("host") not in allowed_hosts:
+                return self._send(403, b"forbidden host", "text/plain")
+            origin = self.headers.get("origin")
+            if origin is not None and origin not in allowed_origins:
+                return self._json({"error": "cross-origin request refused"}, 403)
+            if self.headers.get(CSRF_HEADER) != "1":
+                return self._json({"error": "missing request header"}, 403)
+            if not (self.headers.get("content-type") or "").startswith("application/json"):
+                return self._json({"error": "JSON only"}, 415)
+            try:
+                length = int(self.headers.get("content-length") or 0)
+            except ValueError:
+                length = -1
+            if length < 0 or length > MAX_POST:
+                return self._json({"error": "body too large"}, 413)
+            path = unquote(urlparse(self.path).path)
+            m = re.match(r"^/api/triage/([^/]+)$", path)
+            if not m:
+                return self._send(404, b"not found", "text/plain")
+            try:
+                body = json.loads(self.rfile.read(length) or b"null")
+                entry = triage.update(m.group(1), body)
+            except (ValueError, TriageError) as exc:
+                return self._json({"error": str(exc)}, 400)
+            return self._json(entry)
 
     return Handler
 

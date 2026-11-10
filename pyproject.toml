@@ -23,7 +23,7 @@ threadscan = "threadscan.cli:main"
 include = ["threadscan*"]
 
 [tool.setuptools.package-data]
-threadscan = ["dashboard.html", "static/*.svg", "static/fonts/*"]
+threadscan = ["dashboard.html", "static/*.svg", "static/*.txt", "static/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

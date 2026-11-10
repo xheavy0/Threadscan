@@ -100,7 +100,9 @@ def test_dashboard_never_references_a_font_cdn():
     html = dashboard.HTML_PATH.read_text(encoding="utf-8").replace("http://www.w3.org/2000/svg", "")
     for host in ("fonts.googleapis", "fonts.gstatic", "cdn.", "unpkg", "jsdelivr", "http://", "https://"):
         assert host not in html, host
-    assert "Thread<span>scan</span>" in html
+    # the design system's own assets, all served from this origin
+    for asset in ("/static/fonts/dm-sans.woff2", "/static/fonts/poppins-500.woff2", "/static/threadscan.svg"):
+        assert asset in html and asset in dashboard.STATIC_FILES, asset
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed")
@@ -125,3 +127,35 @@ def test_run_status_passes_usage_limit_fields(runs):
     st = dashboard.run_status(run)
     assert st["summary"]["components_skipped"] == ["a", "b"]
     assert st["summary"]["limit_reached"] is True and "--only" in st["summary"]["resume_command"]
+
+
+def _post(port, path, body, headers):
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    c.request("POST", path, body=body, headers={"Host": f"127.0.0.1:{port}", **headers})
+    r = c.getresponse()
+    data = r.read()
+    c.close()
+    return r.status, data
+
+
+def test_triage_writes_need_same_origin_json_and_the_custom_header(runs):
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), dashboard.make_handler(runs, 0))
+    port = srv.server_address[1]
+    srv.RequestHandlerClass = dashboard.make_handler(runs, port)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    ok_headers = {"Content-Type": "application/json", "X-Threadscan-Request": "1", "Origin": f"http://127.0.0.1:{port}"}
+    body = json.dumps({"status": "in_progress", "assignee": "nino"})
+    try:
+        # a cross-site form post or fetch cannot set the custom header or a foreign Origin
+        assert _post(port, "/api/triage/TS-0123456789", body, {"Content-Type": "application/json"})[0] == 403
+        assert _post(port, "/api/triage/TS-0123456789", body, {**ok_headers, "Origin": "https://evil.example"})[0] == 403
+        assert _post(port, "/api/triage/TS-0123456789", body, {**ok_headers, "Content-Type": "text/plain"})[0] == 415
+        assert _post(port, "/api/triage/../../x", body, ok_headers)[0] in (400, 404)
+        assert _post(port, "/api/triage/TS-0123456789", json.dumps({"status": "done"}), ok_headers)[0] == 400
+        status, data = _post(port, "/api/triage/TS-0123456789", body, ok_headers)
+        assert status == 200 and json.loads(data)["status"] == "in_progress"
+        got = json.loads(_req(port, "GET", "/api/triage")[1])
+        assert got["issues"]["TS-0123456789"]["assignee"] == "nino"
+        assert (runs / "triage.json").is_file()
+    finally:
+        srv.shutdown()

@@ -11,11 +11,14 @@ Master: `threadscan/static/threadscan.svg`, also served as the dashboard favicon
 To list Threadscan in ThreadBox, add `{key: "threadscan", name: "Threadscan", monogram: "TS",
 accent: "#84C21F"}` to its catalog.
 
-**Dashboard.** At the owner's request the dashboard uses a cloud-security-console layout
-(in the style of Wiz, without its name, logo or assets) rather than the Trellis look of
-Threadflow and Threadmap: navy side navigation (`#0b1533`), light work area (`#f4f6fb`),
-primary blue `#1f5eff`, severity colours critical `#b4123a`, high `#e0452a`, medium
-`#e88400`, low `#b98f00`, info `#5b6b8c`; an issues table with filter pills and a detail
-drawer. Type: Inter (UI) and JetBrains Mono (code, paths, ids), self-hosted Latin subsets
-in `threadscan/static/fonts/` (SIL OFL 1.1, licences beside them); no font CDN. The
-Threadscan mark and the lime `scan` in the wordmark keep it recognisably a Thread app.
+**Dashboard.** At the owner's request the dashboard follows Wiz's product design system
+(from Wiz's public product screenshots) rather than the Trellis look of Threadflow and
+Threadmap: a white icon rail with labels, a white top bar with a scope selector and search
+pill, rounded filter pills (blue `#1b5cff` when active), a GROUP BY segmented control, round
+letter severity badges (C `#d1242f` on `#ffe4e6`, H `#c2410c` on `#ffedd5`, M `#a16207` on
+`#fef3c7`, L `#475467` on `#eef1f5`), pill statuses, cards with a title and grey subtitle,
+and a dotted-canvas graph. Type: DM Sans (text) and Poppins (titles), the open fonts Wiz's
+site uses, plus JetBrains Mono; Latin subsets self-hosted in `threadscan/static/fonts/`
+(SIL OFL 1.1, licences beside them). Icons: Lucide (ISC, `threadscan/static/LICENSE-Lucide.txt`),
+inlined as SVG; Wiz's own icon set, name and logo are not used. No font or icon CDN.
+The Threadscan mark keeps it recognisably a Thread app.
