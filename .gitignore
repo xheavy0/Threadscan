@@ -17,5 +17,9 @@ runs/
 *.key
 *.pem
 
+# Only the demo target is shared; other targets describe private code and stay local.
+/targets/*
+!/targets/demo/
+
 # Seed files exported from GitHub code scanning etc. belong to the target, not here.
 targets/*/seeds/

@@ -1294,7 +1294,7 @@ function renderMainOnly() {
   if (!S.st) {
     main.replaceChildren(h("div", { class: "welcome" }, h("img", { src: "/static/threadscan.svg", alt: "" }), h("h1", null, "No scan runs yet"),
       h("p", null, "Start a scan and it appears here while it runs: build, one agent per component, the verification gate, and the issues that passed it."),
-      h("pre", null, "threadscan scan targets/aegis --max-components 1 --dashboard")));
+      h("pre", null, "threadscan scan targets/demo --max-components 1 --dashboard")));
     return;
   }
   const active = document.activeElement && document.activeElement.closest && document.activeElement.closest(".filters .search-pill") ? document.activeElement : null;

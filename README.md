@@ -28,15 +28,14 @@ Diff mode (only components touched since a git ref) is the default; a full scan 
 
 | Part | State |
 |---|---|
-| Config parsing, component splitting, diff selection, seeds, prompts, gate logic, report, dashboard | Implemented, unit-tested (`pytest`), dry run against `targets/aegis` works end to end |
+| Config parsing, component splitting, diff selection, seeds, prompts, gate logic, report, dashboard | Implemented, unit-tested (`pytest`), dry run against `targets/demo` works end to end |
 | Docker build, scan network, gateway, agent runs, verification containers | Implemented, **not yet exercised**: Docker and an API key were not available on the machine v1 was built on |
-| Aegis scan image (`targets/aegis/Dockerfile`) | Written, **not yet built** |
 | Subscription mode (`auth: subscription`) | Implemented and unit-tested, **not yet run against the real API**: whether Claude Code sends its OAuth token through `ANTHROPIC_BASE_URL` is unconfirmed |
 
-Expect the first real run to need small fixes in those last three rows. Follow
+Expect the first real run to need small fixes in those last two rows. Follow
 [LAB-TEST.md](LAB-TEST.md): `threadscan doctor --live` first (it exercises the gateway, the
 token, Claude Code and the verification driver for a few cents), then the small demo target,
-then one Aegis component.
+then one component of a real target.
 
 ## Setup
 
@@ -54,7 +53,7 @@ python -m venv .venv
 `scan.auth` in `project.yaml` (or `--auth`) picks one. Either credential comes from the
 environment of the shell you scan from; never write it into a file in this repo.
 
-**`subscription`** (your own Pro/Max plan, what `targets/aegis` uses). Create a one-year
+**`subscription`** (your own Pro/Max plan, what `targets/demo` uses). Create a one-year
 Claude Code token and set it for the session:
 
 ```bash
@@ -90,20 +89,20 @@ export ANTHROPIC_API_KEY="<key>"          # bash
 ## Usage
 
 ```bash
-threadscan doctor targets/aegis                           # is this machine ready? (free)
-threadscan doctor targets/aegis --live                    # end-to-end smoke test (a few cents)
+threadscan doctor targets/demo                            # is this machine ready? (free)
+threadscan doctor targets/demo --live                     # end-to-end smoke test (a few cents)
 threadscan scan targets/demo --full --max-components 1    # cheap real run on the demo app
-threadscan validate targets/aegis                         # check the config
-threadscan components targets/aegis                       # what diff mode would scan
-threadscan components targets/aegis --full                # all components
-threadscan scan targets/aegis --dry-run --max-components 1   # plan only: no build, no API calls
-threadscan scan targets/aegis --max-components 1 --dashboard # real scan of one component, with dashboard
-threadscan scan targets/aegis --since origin/main         # diff mode against another base
-threadscan scan targets/aegis --full --concurrency 2      # full scan (expensive)
-threadscan scan targets/aegis --seed codeql=codeql.sarif --seed osv=osv.json
+threadscan validate targets/myapp                         # check the config
+threadscan components targets/myapp                       # what diff mode would scan
+threadscan components targets/myapp --full                # all components
+threadscan scan targets/myapp --dry-run --max-components 1   # plan only: no build, no API calls
+threadscan scan targets/myapp --max-components 1 --dashboard # real scan of one component, with dashboard
+threadscan scan targets/myapp --since origin/main         # diff mode against another base
+threadscan scan targets/myapp --full --concurrency 2      # full scan (expensive)
+threadscan scan targets/myapp --seed codeql=codeql.sarif --seed osv=osv.json
 threadscan dashboard                                      # http://127.0.0.1:8765/
 threadscan export runs/<run-id> --format all              # SARIF, CSV, JSON, self-contained HTML
-threadscan recheck targets/aegis                          # re-verify open issues on the current code (no API usage)
+threadscan recheck targets/myapp                          # re-verify open issues on the current code (no API usage)
 ```
 
 Useful flags: `--only NAME` (repeatable) scans named components; `--repo PATH|URL`
@@ -403,7 +402,7 @@ What the scanner protects, and how:
 - **Verification has no network at all** (`--network none`), so a reproducer cannot reach
   the API, the gateway or the internet.
 - **Target content is untrusted input.** The agent loads no settings, hooks or `CLAUDE.md`
-  from the target (`setting_sources=[]`); the Aegis build context excludes `.claude/`,
+  from the target (`setting_sources=[]`); a target's `Dockerfile.dockerignore` should exclude `.claude/`,
   `CLAUDE.md`, `.git`, `.env*` and key material. The system prompt tells the agent that repo
   content is material under review, never instructions.
 - **Limited agent tools.** Read, Grep, Glob and Bash only, `dontAsk` permission mode (no
@@ -478,7 +477,7 @@ that fetches dependencies and then checks the build works offline, a `Dockerfile
 and a threat-model skeleton. Lines that need a decision say `TODO`. It never overwrites a
 target and never writes to the repository. Then review it and run `threadscan doctor <target> --live`.
 
-To write one by hand: Copy `targets/aegis/` as a template: point `repo` at the checkout, write a Dockerfile that
+To write one by hand: copy `targets/demo/` as a template: point `repo` at the checkout, write a Dockerfile that
 leaves the source and an offline-ready build at `workdir`, describe trust boundaries and
 severity rules in `threat_model.md`, then `threadscan validate` and `threadscan components`.
 
@@ -490,3 +489,8 @@ severity rules in `threat_model.md`, then `threadscan validate` and `threadscan 
 
 There are no GitHub Actions workflows in this repo on purpose: the account's Actions
 budget is zero. Run the tests locally.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE). Bundled fonts (Rubik, Fira Code: SIL OFL 1.1) and Lucide icons (ISC) keep their own licenses, in `threadscan/static/`.
+

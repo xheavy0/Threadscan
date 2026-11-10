@@ -3,8 +3,8 @@
 Assignment order for every file that survives include/exclude:
 1. the first explicit component (in config order) with a matching glob;
 2. otherwise the deepest ``auto`` root containing it, split ``depth`` directories
-   below that root (``backend/src/main/java/com/aegis`` at depth 1 yields
-   ``.../aegis/auth``, ``.../aegis/storage`` ...; files directly in the root form
+   below that root (``backend/src/main/java/com/example`` at depth 1 yields
+   ``.../example/auth``, ``.../example/storage`` ...; files directly in the root form
    a component named after the root);
 3. otherwise the ``leftover`` component, or nowhere if ``leftover`` is null.
 """

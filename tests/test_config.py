@@ -22,7 +22,7 @@ def test_minimal_config_gets_safe_defaults(target_dir, tmp_path):
 def test_full_config(target_dir):
     d = target_dir(
         """
-        name: aegis
+        name: webapp
         repo: https://github.com/example/app.git#develop
         workdir: /work/app
         diff_base: origin/main
@@ -138,9 +138,8 @@ def test_not_yaml(target_dir):
         load_project(d)
 
 
-def test_shipped_aegis_target_parses():
-    cfg = load_project(Path(__file__).resolve().parents[1] / "targets" / "aegis")
-    assert cfg.name == "aegis"
-    assert cfg.scan.auth == "subscription" and cfg.scan.concurrency == 1
-    assert cfg.known_issues == "docs/security/open-findings.md"
-    assert "Severity" in cfg.threat_model_text
+def test_shipped_demo_target_parses():
+    cfg = load_project(Path(__file__).resolve().parents[1] / "targets" / "demo")
+    assert cfg.name == "demo"
+    assert cfg.scan.auth == "subscription"
+    assert cfg.threat_model_text

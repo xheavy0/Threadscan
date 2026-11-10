@@ -1,6 +1,6 @@
 # Threadscan end-to-end test target: a tiny, intentionally vulnerable app in this repo
 # (examples/vulnapp). Builds in under a minute and needs one component, so a real run
-# costs little. Use it to prove the pipeline before scanning Aegis:
+# costs little. Use it to prove the pipeline before scanning a real target:
 #
 #   threadscan scan targets/demo --full --max-components 1 --dashboard
 #

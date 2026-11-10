@@ -71,15 +71,16 @@ with a reproducer that prints the proof on the unpatched code and not after the 
 nothing is verified, look at Gate (drop reasons), `runs\<run>\dropped.json` and
 `runs\<run>\components\*\out\transcript.jsonl`.
 
-## 6. Aegis, one component
+## 6. A real target, one component
 
-The Aegis checkout must sit next to this one (`..\cee-grc-tool`) or be given with `--repo`.
+Targets other than `targets\demo` are gitignored, so private targets stay on this machine.
+Point `repo` in the target's `project.yaml` at the checkout, or pass `--repo`.
 
 ```powershell
-.venv\Scripts\threadscan scan targets\aegis --max-components 1 --dashboard
+.venv\Scripts\threadscan scan targets\<name> --max-components 1 --dashboard
 ```
 
-The first build of the Aegis scan image downloads Maven and npm dependencies: allow 10–20
+The first build of a large target's scan image downloads all its dependencies: allow 10–20
 minutes and 10–20 GiB of disk. Later runs reuse it. Diff mode scans what changed since
 `HEAD~1`; pass `--since <ref>` for more, or `--only auth` for a chosen component.
 

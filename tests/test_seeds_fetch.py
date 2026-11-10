@@ -19,7 +19,7 @@ class FakeGh:
         self.calls.append(args)
         cmd = " ".join(args)
         if "remote get-url origin" in cmd:
-            return 0, "git@github.com:xheavy0/Aegis-2.git\n", ""
+            return 0, "git@github.com:example/webapp.git\n", ""
         if "rev-parse --abbrev-ref HEAD" in cmd:
             return 0, "main\n", ""
         if args[:2] == ["gh", "api"] and "analyses?" in args[2]:
@@ -36,7 +36,7 @@ class FakeGh:
 
 
 def test_github_slug():
-    assert github_slug("https://github.com/xheavy0/Aegis-2.git") == "xheavy0/Aegis-2"
+    assert github_slug("https://github.com/example/webapp.git") == "example/webapp"
     assert github_slug("git@github.com:xheavy0/Threadscan.git\n") == "xheavy0/Threadscan"
     assert github_slug("https://gitlab.com/a/b.git") is None
 
@@ -59,9 +59,9 @@ def test_fetch_codeql_newest_per_language_into_target_seeds(tmp_path, monkeypatc
     assert by["codeql"].status == "ok" and "2 analyses" in by["codeql"].detail
     assert by["gitleaks"].status == "skipped" and by["osv"].status == "skipped"
     list_call = next(c for c in gh.calls if c[:2] == ["gh", "api"] and "analyses?" in c[2])
-    assert list_call[2].startswith("repos/xheavy0/Aegis-2/code-scanning/analyses") and "ref=refs/heads/main" in list_call[2]
+    assert list_call[2].startswith("repos/example/webapp/code-scanning/analyses") and "ref=refs/heads/main" in list_call[2]
     downloads = [c[-1] for c in gh.calls if c[:3] == ["gh", "api", "-H"]]
-    assert downloads == ["repos/xheavy0/Aegis-2/code-scanning/analyses/2", "repos/xheavy0/Aegis-2/code-scanning/analyses/3"]
+    assert downloads == ["repos/example/webapp/code-scanning/analyses/2", "repos/example/webapp/code-scanning/analyses/3"]
     seeds = load_seed_file("codeql", tmp_path / "seeds" / "codeql.sarif")
     assert sorted(s.rule for s in seeds) == ["rule-2", "rule-3"]
     assert all(c[:2] != ["git", "push"] for c in gh.calls)  # read-only

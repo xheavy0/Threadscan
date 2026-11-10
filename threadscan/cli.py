@@ -18,7 +18,7 @@ def _seed_arg(value: str) -> SeedSpec:
 
 
 def _add_target_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("target", type=Path, help="target config dir, e.g. targets/aegis")
+    p.add_argument("target", type=Path, help="target config dir, e.g. targets/demo")
     p.add_argument("--repo", help="override project.yaml repo (local path or git URL[#branch])")
 
 
@@ -361,7 +361,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_export)
 
     p = sub.add_parser("doctor", help="check this machine is ready to scan; --live runs a cheap end-to-end test")
-    p.add_argument("target", type=Path, nargs="?", help="optional target config dir, e.g. targets/aegis")
+    p.add_argument("target", type=Path, nargs="?", help="optional target config dir, e.g. targets/demo")
     p.add_argument("--repo", help="override project.yaml repo")
     p.add_argument("--live", action="store_true", help="also start the gateway, build a small scan image and run one tiny agent")
     p.add_argument("--auth", choices=AUTH_MODES, help="default: the target's scan.auth, else subscription")

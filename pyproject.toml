@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Standalone AI vulnerability scanner: builds a target in Docker, scans it offline with Claude, keeps only findings whose reproducer runs."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 # The host side needs PyYAML only. The Claude Agent SDK is installed inside the
 # scan image (docker/overlay.Dockerfile), never on the host.
 dependencies = ["PyYAML>=6.0"]

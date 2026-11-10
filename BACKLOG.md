@@ -54,4 +54,4 @@ Fira Code, the fonts Wiz's product UI loads.
 
 - [ ] `threadscan doctor targets\demo --live` all OK
 - [ ] Demo scan verifies at least one planted bug
-- [ ] One Aegis component scanned end to end
+- [ ] One component of a real target scanned end to end
