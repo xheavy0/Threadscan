@@ -32,7 +32,7 @@ the lab machine (see LAB-TEST.md).
 - [x] **T5 `threadscan seeds <target>`**: fetch seed input: the latest CodeQL SARIF per
   language from GitHub code scanning (read-only `gh api`), plus gitleaks (`--redact`) and
   osv-scanner when installed, into `targets/<name>/seeds/`.
-- [ ] **T6 `threadscan watch <target>`**: poll the target repo; when HEAD moves, run a diff
+- [x] **T6 `threadscan watch <target>`**: poll the target repo; when HEAD moves, run a diff
   scan since the last scanned commit (one at a time; respects the usage-limit stop);
   optional `--recheck` after each scan.
 - [ ] **T7 `threadscan prune`**: keep the newest N finished runs per target (default 10);

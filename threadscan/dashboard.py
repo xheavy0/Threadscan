@@ -204,6 +204,16 @@ def make_handler(runs_dir: Path, port: int):
             return self._send(404, b"not found", "text/plain")
 
         def do_POST(self):
+            # Read the body before any refusal: replying with unread request data makes some
+            # stacks (Windows) reset the connection instead of delivering the error.
+            try:
+                length = int(self.headers.get("content-length") or 0)
+            except ValueError:
+                length = -1
+            if length < 0 or length > MAX_POST:
+                self.close_connection = True
+                return self._json({"error": "body too large"}, 413)
+            raw = self.rfile.read(length) if length else b""
             if self.headers.get("host") not in allowed_hosts:
                 return self._send(403, b"forbidden host", "text/plain")
             origin = self.headers.get("origin")
@@ -213,18 +223,12 @@ def make_handler(runs_dir: Path, port: int):
                 return self._json({"error": "missing request header"}, 403)
             if not (self.headers.get("content-type") or "").startswith("application/json"):
                 return self._json({"error": "JSON only"}, 415)
-            try:
-                length = int(self.headers.get("content-length") or 0)
-            except ValueError:
-                length = -1
-            if length < 0 or length > MAX_POST:
-                return self._json({"error": "body too large"}, 413)
             path = unquote(urlparse(self.path).path)
             m = re.match(r"^/api/triage/([^/]+)$", path)
             if not m:
                 return self._send(404, b"not found", "text/plain")
             try:
-                body = json.loads(self.rfile.read(length) or b"null")
+                body = json.loads(raw or b"null")
                 entry = triage.update(m.group(1), body)
             except (ValueError, TriageError) as exc:
                 return self._json({"error": str(exc)}, 400)

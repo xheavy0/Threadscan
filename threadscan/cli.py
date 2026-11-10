@@ -117,7 +117,7 @@ def cmd_doctor(a) -> int:
     return 1 if report.failed else 0
 
 
-def cmd_recheck(a) -> int:
+def do_recheck(cfg, runs_dir: Path, cache_dir: Path, offline: bool = False, run_id: str | None = None, include_all: bool = False) -> dict:
     import time
 
     from threadscan import docker_ops as dk
@@ -126,25 +126,55 @@ def cmd_recheck(a) -> int:
     from threadscan.repo import head_commit, resolve_repo
     from threadscan.triage import TriageStore
 
-    cfg = load_project(a.target, a.repo)
-    runs_dir = Path(a.runs_dir).resolve()
-    source = pick_source_run(runs_dir, cfg.name, a.run)
+    runs_dir = runs_dir.resolve()
+    source = pick_source_run(runs_dir, cfg.name, run_id)
     if source is None:
-        print(f"error: no finished run of {cfg.name} in {runs_dir}" + (f" with id {a.run}" if a.run else ""), file=sys.stderr)
-        return 2
+        raise RuntimeError(f"no finished run of {cfg.name} in {runs_dir}" + (f" with id {run_id}" if run_id else ""))
     ok, why = dk.Docker.available()
     if not ok:
         raise RuntimeError(f"Docker is required for a re-check ({why})")
-    repo = resolve_repo(cfg, Path(a.cache_dir).resolve(), offline=a.offline)
+    repo = resolve_repo(cfg, cache_dir.resolve(), offline=offline)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     work = runs_dir / "rechecks" / f"{stamp}-{cfg.name}"
     work.mkdir(parents=True, exist_ok=False)
     print(f"re-checking {len(source['findings'])} issues from {source['run_id']} against the current code (no API usage)")
     backend = DockerBackend(cfg, repo, f"recheck-{stamp}")
     backend.build_images(work)
-    out = recheck(cfg, runs_dir, work, backend.executor(work), TriageStore(runs_dir / "triage.json"), a.run, a.all, head_commit(repo))
+    out = recheck(cfg, runs_dir, work, backend.executor(work), TriageStore(runs_dir / "triage.json"), run_id, include_all, head_commit(repo))
     s = out["summary"]
     print(f"fixed {s['fixed']} · still present {s['still_present']} · unverified {s['unverified']}  ->  {work / 'recheck.json'}")
+    return out
+
+
+def cmd_recheck(a) -> int:
+    cfg = load_project(a.target, a.repo)
+    do_recheck(cfg, Path(a.runs_dir), Path(a.cache_dir), a.offline, a.run, a.all)
+    return 0
+
+
+def cmd_watch(a) -> int:
+    from threadscan.orchestrator import ScanOptions, run_scan
+    from threadscan.repo import head_commit, resolve_repo
+    from threadscan.watch import parse_interval, watch_loop, watch_once
+
+    interval = parse_interval(a.interval)
+    cfg = load_project(a.target, a.repo)
+    runs_dir, cache_dir = Path(a.runs_dir), Path(a.cache_dir)
+    state = runs_dir / ".watch" / f"{cfg.name}.json"
+
+    def head() -> str | None:
+        return head_commit(resolve_repo(load_project(a.target, a.repo), cache_dir.resolve()))
+
+    def scan(last: str | None) -> Path:
+        c = load_project(a.target, a.repo)  # pick up config edits between rounds
+        return run_scan(c, ScanOptions(mode="diff", base=last or c.diff_base, runs_dir=runs_dir, cache_dir=cache_dir, concurrency=a.concurrency))
+
+    recheck_fn = (lambda: do_recheck(load_project(a.target, a.repo), runs_dir, cache_dir)) if a.recheck else None
+    print(f"watching {cfg.name} every {interval // 60} min (Ctrl+C to stop); state in {state}")
+    try:
+        watch_loop(interval, lambda: watch_once(state, head, scan, recheck_fn, initial=a.initial), max_rounds=1 if a.once else None)
+    except KeyboardInterrupt:
+        print("stopped")
     return 0
 
 
@@ -245,6 +275,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cache-dir", default=".cache")
     p.add_argument("--offline", action="store_true", help="do not fetch a remote repo")
     p.set_defaults(fn=cmd_recheck)
+
+    p = sub.add_parser("watch", help="scan new commits as they land (diff scans, one at a time)")
+    _add_target_args(p)
+    p.add_argument("--interval", default="15m", help="how often to check, e.g. 15m, 1h (minimum 60s)")
+    p.add_argument("--initial", action="store_true", help="scan right away against diff_base instead of only recording a baseline")
+    p.add_argument("--recheck", action="store_true", help="after each scan, re-run the reproducers of open issues")
+    p.add_argument("--once", action="store_true", help="check once and exit (for a scheduler)")
+    p.add_argument("--concurrency", type=int, metavar="N")
+    p.add_argument("--runs-dir", default="runs")
+    p.add_argument("--cache-dir", default=".cache")
+    p.set_defaults(fn=cmd_watch)
 
     p = sub.add_parser("init", help="scaffold targets/<name>/ for a repository (detects the stack; never touches the repo)")
     p.add_argument("repo_path", help="path to the repository to scan")

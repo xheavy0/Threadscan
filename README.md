@@ -121,6 +121,17 @@ the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by 
 `--model` to change), and runs the verification driver offline. Results are printed and
 saved to `runs/doctor-<time>/doctor.json`.
 
+### Watching for new commits
+
+`threadscan watch <target> [--interval 15m] [--recheck] [--initial] [--once]` checks the
+repository on an interval (fetching a remote one) and, when HEAD moves, runs a diff scan
+since the last scanned commit, one scan at a time. The first start only records a baseline
+(`--initial` scans right away). A failed scan keeps the baseline so the same range is tried
+again; when the subscription's usage limit stops a scan it pauses for an hour and keeps the
+baseline, so skipped components are covered later. `--recheck` re-runs the reproducers of
+open issues after each scan. `--once` checks a single time, for a scheduler. State is in
+`runs/.watch/<name>.json`.
+
 ### Seeds
 
 `threadscan seeds <target> [--tool codeql|gitleaks|osv] [--github owner/repo] [--ref REF]`
