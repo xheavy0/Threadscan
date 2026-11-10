@@ -24,7 +24,7 @@ the lab machine (see LAB-TEST.md).
 - [x] **T2 Severity override and "Copy as GitHub issue"**: triage can adjust an issue's
   severity (the original is kept and shown); dashboard, exports and SARIF use the adjusted
   one. The drawer copies a ready Markdown issue body (never posts anything).
-- [ ] **T3 Verified-fixes patch bundle**: one `verified-fixes.patch` with every patch the gate
+- [x] **T3 Verified-fixes patch bundle**: one `verified-fixes.patch` with every patch the gate
   verified, in file order, each with a header naming its issue; export format `patches`.
 - [ ] **T4 `threadscan init <repo>`**: scaffold `targets/<name>/` (project.yaml, Dockerfile,
   threat_model.md) by detecting Maven, Gradle, npm/pnpm/yarn, Python, Go, Rust, .NET; never

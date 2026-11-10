@@ -133,8 +133,8 @@ Results go to `runs/rechecks/` and the dashboard's Reports view.
 
 ### Reports and exports
 
-Every finished run writes `findings.sarif` and `report.html` next to `report.md`.
-`threadscan export <run> --format sarif|csv|json|html|all [--out DIR]` regenerates them with
+Every finished run writes `findings.sarif`, `report.html` and `verified-fixes.patch` next to `report.md`.
+`threadscan export <run> --format sarif|csv|json|html|patches|all [--out DIR]` regenerates them with
 the current triage, and the dashboard's **Reports** view downloads any of them per run.
 
 - **HTML:** one self-contained file (styles, fonts and mark embedded, no script, every value
@@ -149,6 +149,10 @@ the current triage, and the dashboard's **Reports** view downloads any of them p
   gzip -c findings.sarif | base64 -w0 > sarif.b64
   gh api repos/OWNER/REPO/code-scanning/sarifs -f commit_sha=<full sha> -f ref=refs/heads/main -F sarif=@sarif.b64
   ```
+- **Verified fixes (`verified-fixes.patch`):** every patch the gate proved (the reproducer
+  stopped with it applied), in file order, each under a comment naming its issue; issues
+  triaged as false positive are left out. `git apply --check` it first; each patch was
+  verified on its own, so overlapping ones may need applying one at a time.
 - **CSV / JSON:** the issues with status, assignee, lifecycle and verification. CSV cells that
   could run as spreadsheet formulas are prefixed with `'`.
 

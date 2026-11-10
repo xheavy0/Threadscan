@@ -31,7 +31,8 @@ LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note
 SUPPRESSED = {"risk_accepted": "accepted risk", "false_positive": "false positive"}
 STATUS_LABEL = {"open": "Open", "in_progress": "In progress", "resolved": "Resolved", "risk_accepted": "Risk accepted", "false_positive": "False positive"}
 FORMATS = {"sarif": ("findings.sarif", "application/sarif+json"), "csv": ("findings.csv", "text/csv"),
-           "json": ("findings-export.json", "application/json"), "html": ("report.html", "text/html")}
+           "json": ("findings-export.json", "application/json"), "html": ("report.html", "text/html"),
+           "patches": ("verified-fixes.patch", "text/x-diff")}
 
 
 def _load(path: Path, default):
@@ -166,6 +167,39 @@ def to_json(data: RunData) -> str:
     return json.dumps(redact_obj({"run": data.meta, "issues": [{**r, "description": f.get("description"), "impact": f.get("impact"),
                                                                 "reproducer": f.get("reproducer"), "patch": f.get("patch")}
                                                                for r, f in zip(rows(data), data.findings)]}), indent=1)
+
+
+# ------------------------------------------------------------------ patches
+
+
+def to_patches(data: RunData) -> str:
+    """Every patch the gate verified (the reproducer stopped with it applied), in file order.
+
+    Issues triaged as false positive are left out. Comment lines between patches are ignored
+    by ``git apply``. Each patch was verified on its own; patches touching the same lines may
+    not apply together, so the header says how to apply them one at a time."""
+    chosen = [f for f in data.findings
+              if f.get("patch") and (f.get("verification") or {}).get("patch_check") == "fixed"
+              and data.triage_of(f).get("status") != "false_positive"]
+    chosen.sort(key=lambda f: (f.get("file", ""), f.get("line", 0), f["id"]))
+    meta = data.meta
+    out = [
+        f"# Threadscan verified fixes for {meta.get('project')} (run {meta.get('run_id')}, commit {(meta.get('commit') or 'unknown')[:12]})",
+        f"# {len(chosen)} patch(es). Each one stopped its issue's reproducer when applied on its own.",
+        "# Check first:  git apply --check verified-fixes.patch",
+        "# Apply all:    git apply verified-fixes.patch",
+        "# If two patches overlap, apply them one at a time from the per-issue blocks below.",
+        "",
+    ]
+    for f in chosen:
+        t = data.triage_of(f)
+        out += [
+            f"# ---- {f['id']} [{f.get('severity')}] {f.get('title')}".replace("\n", " "),
+            f"# {f.get('location')} · component {f.get('component')} · triage {t.get('status')}",
+            f.get("patch", "").rstrip("\n"),
+            "",
+        ]
+    return redact("\n".join(out) + "\n")
 
 
 # ------------------------------------------------------------------ HTML
@@ -325,11 +359,12 @@ def export(run_dir: Path, fmt: str, triage: dict | None = None) -> tuple[str, st
         raise ValueError(f"unknown format {fmt}; use one of {', '.join(FORMATS)}")
     data = RunData(run_dir, triage)
     name, ctype = FORMATS[fmt]
-    content = {"sarif": lambda: json.dumps(to_sarif(data), indent=1), "csv": lambda: to_csv(data), "json": lambda: to_json(data), "html": lambda: to_html(data)}[fmt]()
+    content = {"sarif": lambda: json.dumps(to_sarif(data), indent=1), "csv": lambda: to_csv(data), "json": lambda: to_json(data), "html": lambda: to_html(data),
+               "patches": lambda: to_patches(data)}[fmt]()
     return name, ctype, content
 
 
-def write_exports(run_dir: Path, triage: dict | None = None, formats: tuple[str, ...] = ("sarif", "html")) -> list[Path]:
+def write_exports(run_dir: Path, triage: dict | None = None, formats: tuple[str, ...] = ("sarif", "html", "patches")) -> list[Path]:
     out = []
     for fmt in formats:
         name, _, content = export(run_dir, fmt, triage)

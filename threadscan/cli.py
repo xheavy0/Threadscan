@@ -213,7 +213,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("export", help="export a run's verified issues: SARIF, CSV, JSON or a self-contained HTML report")
     p.add_argument("run", help="run directory, or a run id inside --runs-dir")
-    p.add_argument("--format", choices=["sarif", "csv", "json", "html", "all"], default="all")
+    p.add_argument("--format", choices=["sarif", "csv", "json", "html", "patches", "all"], default="all")
     p.add_argument("--out", help="directory to write to (default: the run directory)")
     p.add_argument("--runs-dir", default="runs")
     p.set_defaults(fn=cmd_export)

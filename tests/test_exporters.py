@@ -84,7 +84,7 @@ def test_every_format_and_auto_written_files(tmp_path):
         assert content and name == FORMATS[fmt][0]
     json.loads(export(run, "sarif")[2]) and json.loads(export(run, "json")[2])
     written = write_exports(run)
-    assert {p.name for p in written} == {"findings.sarif", "report.html"}
+    assert {p.name for p in written} == {"findings.sarif", "report.html", "verified-fixes.patch"}
     with pytest.raises(ValueError):
         export(run, "pdf")
 
@@ -131,3 +131,22 @@ def test_severity_override_flows_into_exports(tmp_path):
     assert list(csv.DictReader(io.StringIO(to_csv(data))))[0]["severity"] == "low"
     plain = RunData(run, {})
     assert plain.findings[0]["severity"] == "critical" and "original_severity" not in plain.findings[0]
+
+
+def test_patch_bundle_applies_with_git_and_skips_unverified(tmp_path):
+    import subprocess
+    _, run, f = make_run(tmp_path)
+    bundle = export(run, "patches")[2]
+    assert f["id"] in bundle and bundle.count("+++ b/app/Login.java") == 1
+    repo = tmp_path / "target"
+    (repo / "app").mkdir(parents=True)
+    (repo / "app" / "Login.java").write_text("class Login { boolean check() { return true; } }\n")
+    (tmp_path / "b.patch").write_text(bundle)
+    check = subprocess.run(["git", "apply", "--check", str(tmp_path / "b.patch")], cwd=repo, capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr
+    assert f["id"] not in export(run, "patches", {f["id"]: {"status": "false_positive"}})[2]
+    # a patch the gate did not verify is never bundled
+    findings = json.loads((run / "findings.json").read_text())
+    findings[0]["verification"]["patch_check"] = "not_fixed"
+    (run / "findings.json").write_text(json.dumps(findings))
+    assert "+++ b/" not in export(run, "patches")[2]

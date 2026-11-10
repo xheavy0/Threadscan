@@ -1034,7 +1034,7 @@ function findingsView() {
 }
 
 /* ---------- Reports ---------- */
-const EXPORTS = [["html", "HTML report"], ["sarif", "SARIF"], ["csv", "CSV"], ["json", "JSON"]];
+const EXPORTS = [["html", "HTML report"], ["sarif", "SARIF"], ["patches", "Verified fixes"], ["csv", "CSV"], ["json", "JSON"]];
 function exportUrl(runId, fmt) { return "/api/runs/" + encodeURIComponent(runId) + "/export/" + fmt; }
 function reportsView() {
   const done = S.runs.filter(r => r.phase === "done" && !r.dry_run);
