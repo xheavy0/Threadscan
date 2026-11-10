@@ -121,6 +121,13 @@ the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by 
 `--model` to change), and runs the verification driver offline. Results are printed and
 saved to `runs/doctor-<time>/doctor.json`.
 
+### Tidying up
+
+`threadscan prune [--keep 10] [--project NAME] [--yes]` lists, and with `--yes` deletes, old
+run directories: per target it keeps the newest N finished runs and always the newest
+completed scan (the next scan's comparison baseline); running scans, `triage.json` and
+`.watch/` are never touched, and nothing outside the runs directory is ever removed.
+
 ### Watching for new commits
 
 `threadscan watch <target> [--interval 15m] [--recheck] [--initial] [--once]` checks the

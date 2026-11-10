@@ -213,6 +213,24 @@ def cmd_seeds(a) -> int:
     return 1 if any(o.status == "failed" for o in outcomes) else 0
 
 
+def cmd_prune(a) -> int:
+    from threadscan.prune import apply_prune, plan_prune
+
+    runs_dir = Path(a.runs_dir)
+    delete, kept = plan_prune(runs_dir, a.keep, a.project)
+    total = sum(i.size() for i in delete)
+    for it in delete:
+        print(f"delete  {it.kind:<8} {it.project:<16} {it.path.name}")
+    print(f"{len(delete)} to delete ({total / 1024 / 1024:.1f} MiB), {len(kept)} kept; triage.json and .watch/ are never touched")
+    if not delete:
+        return 0
+    if not a.yes:
+        print("dry run: nothing deleted. Run again with --yes to delete.")
+        return 0
+    print(f"deleted {apply_prune(runs_dir, delete)} directories")
+    return 0
+
+
 def cmd_export(a) -> int:
     from threadscan.exporters import FORMATS, export
     from threadscan.triage import TriageStore
@@ -286,6 +304,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--cache-dir", default=".cache")
     p.set_defaults(fn=cmd_watch)
+
+    p = sub.add_parser("prune", help="delete old runs, keeping the newest N per target and each target's comparison baseline")
+    p.add_argument("--keep", type=int, default=10, help="finished runs to keep per target (default 10)")
+    p.add_argument("--project", help="only this target")
+    p.add_argument("--yes", action="store_true", help="actually delete (default: only list)")
+    p.add_argument("--runs-dir", default="runs")
+    p.set_defaults(fn=cmd_prune)
 
     p = sub.add_parser("init", help="scaffold targets/<name>/ for a repository (detects the stack; never touches the repo)")
     p.add_argument("repo_path", help="path to the repository to scan")
