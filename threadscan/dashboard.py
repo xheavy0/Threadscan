@@ -168,6 +168,10 @@ def make_handler(runs_dir: Path, port: int):
                 return self._json(list_runs(runs_dir))
             if path == "/api/triage":
                 return self._json({"statuses": STATUSES, "issues": triage.load()})
+            if path == "/api/rechecks":
+                from threadscan.recheck import list_rechecks
+
+                return self._json(list_rechecks(runs_dir))
             if path == "/api/owasp":
                 return self._json(categories())
             m = re.match(r"^/api/projects/([^/]+)/history$", path)

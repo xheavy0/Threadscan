@@ -37,7 +37,9 @@ class TriageStore:
         except (OSError, ValueError):
             return {}
 
-    def update(self, issue_id: str, body: object) -> dict:
+    def update(self, issue_id: str, body: object, by: str | None = None, reason: str | None = None) -> dict:
+        """Apply a change. ``by``/``reason`` mark automatic changes (e.g. ``threadscan recheck``)
+        so the Activity log tells them apart from a person's."""
         if not ID_RE.match(issue_id or ""):
             raise TriageError("malformed issue id")
         if not isinstance(body, dict) or set(body) - {"status", "assignee", "note"}:
@@ -61,7 +63,12 @@ class TriageStore:
             if changes:
                 now = time.time()
                 entry["updated"] = now
-                entry["history"] = (entry.get("history") or []) + [{"at": now, "changes": changes}]
+                event = {"at": now, "changes": changes}
+                if by:
+                    event["by"] = by[:80]
+                if reason:
+                    event["reason"] = reason[:500]
+                entry["history"] = (entry.get("history") or []) + [event]
                 entry["history"] = entry["history"][-MAX_HISTORY:]
                 data[issue_id] = entry
                 self.path.parent.mkdir(parents=True, exist_ok=True)

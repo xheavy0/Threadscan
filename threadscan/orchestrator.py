@@ -108,6 +108,11 @@ class DockerBackend:
         self.networks: list[str] = []
 
     def prepare(self, run_dir: Path) -> None:
+        self.build_images(run_dir)
+        self.start_gateway(run_dir)
+
+    def build_images(self, run_dir: Path) -> None:
+        """Target image from the current code, then the scan overlay. Network on, one at a time."""
         self.run_dir = run_dir
         logs = run_dir / "logs"
         # Builds run one at a time and with network on: this is where dependencies are fetched.
@@ -122,6 +127,8 @@ class DockerBackend:
             "scan overlay build",
             log=logs / "build-overlay.log",
         )
+
+    def start_gateway(self, run_dir: Path) -> None:
         # Networks: the scan network has no route out; the gateway alone bridges to the egress network.
         self.docker.network_create(self.internal_net, internal=True)
         self.networks.append(self.internal_net)

@@ -103,6 +103,7 @@ threadscan scan targets/aegis --full --concurrency 2      # full scan (expensive
 threadscan scan targets/aegis --seed codeql=codeql.sarif --seed osv=osv.json
 threadscan dashboard                                      # http://127.0.0.1:8765/
 threadscan export runs/<run-id> --format all              # SARIF, CSV, JSON, self-contained HTML
+threadscan recheck targets/aegis                          # re-verify open issues on the current code (no API usage)
 ```
 
 Useful flags: `--only NAME` (repeatable) scans named components; `--repo PATH|URL`
@@ -119,6 +120,16 @@ checks that the internal network cannot reach the internet, builds a small scan 
 the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by default,
 `--model` to change), and runs the verification driver offline. Results are printed and
 saved to `runs/doctor-<time>/doctor.json`.
+
+### Re-checking fixes
+
+`threadscan recheck <target> [--run ID] [--all]` rebuilds the target image from the current
+code and re-runs the reproducer of every open issue from the latest finished run, offline and
+without agents, so it uses no API or subscription usage. Exit 0 without the proof line marks
+the issue Resolved in triage, with the evidence and commit in its Activity; a reproducer that
+still works re-opens an issue someone had marked Resolved; one that cannot run changes
+nothing and is reported. Risk-accepted and false-positive issues are skipped unless `--all`.
+Results go to `runs/rechecks/` and the dashboard's Reports view.
 
 ### Reports and exports
 

@@ -117,6 +117,37 @@ def cmd_doctor(a) -> int:
     return 1 if report.failed else 0
 
 
+def cmd_recheck(a) -> int:
+    import time
+
+    from threadscan import docker_ops as dk
+    from threadscan.orchestrator import DockerBackend
+    from threadscan.recheck import pick_source_run, recheck
+    from threadscan.repo import head_commit, resolve_repo
+    from threadscan.triage import TriageStore
+
+    cfg = load_project(a.target, a.repo)
+    runs_dir = Path(a.runs_dir).resolve()
+    source = pick_source_run(runs_dir, cfg.name, a.run)
+    if source is None:
+        print(f"error: no finished run of {cfg.name} in {runs_dir}" + (f" with id {a.run}" if a.run else ""), file=sys.stderr)
+        return 2
+    ok, why = dk.Docker.available()
+    if not ok:
+        raise RuntimeError(f"Docker is required for a re-check ({why})")
+    repo = resolve_repo(cfg, Path(a.cache_dir).resolve(), offline=a.offline)
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    work = runs_dir / "rechecks" / f"{stamp}-{cfg.name}"
+    work.mkdir(parents=True, exist_ok=False)
+    print(f"re-checking {len(source['findings'])} issues from {source['run_id']} against the current code (no API usage)")
+    backend = DockerBackend(cfg, repo, f"recheck-{stamp}")
+    backend.build_images(work)
+    out = recheck(cfg, runs_dir, work, backend.executor(work), TriageStore(runs_dir / "triage.json"), a.run, a.all, head_commit(repo))
+    s = out["summary"]
+    print(f"fixed {s['fixed']} · still present {s['still_present']} · unverified {s['unverified']}  ->  {work / 'recheck.json'}")
+    return 0
+
+
 def cmd_export(a) -> int:
     from threadscan.exporters import FORMATS, export
     from threadscan.triage import TriageStore
@@ -170,6 +201,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_dashboard)
+
+    p = sub.add_parser("recheck", help="re-run the reproducers of open issues on the current code (no agents, no API usage)")
+    _add_target_args(p)
+    p.add_argument("--run", help="run id to re-check (default: the latest finished run of the target)")
+    p.add_argument("--all", action="store_true", help="also re-check issues triaged as risk accepted or false positive")
+    p.add_argument("--runs-dir", default="runs")
+    p.add_argument("--cache-dir", default=".cache")
+    p.add_argument("--offline", action="store_true", help="do not fetch a remote repo")
+    p.set_defaults(fn=cmd_recheck)
 
     p = sub.add_parser("export", help="export a run's verified issues: SARIF, CSV, JSON or a self-contained HTML report")
     p.add_argument("run", help="run directory, or a run id inside --runs-dir")

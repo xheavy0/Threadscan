@@ -1026,6 +1026,10 @@ function reportsView() {
           h("p", { class: "muted", style: "margin-bottom:10px" }, "The SARIF file follows the 2.1.0 standard. Risk-accepted and false-positive issues carry a suppression, so they arrive dismissed. Code scanning must be enabled on the repository; uploading writes to GitHub."),
           h("div", { class: "copy-row" }, h("button", { class: "btn-ghost", type: "button", onclick: e => copyText(sarifCmd, e.currentTarget) }, icon("copy", "sm"), "Copy")),
           h("pre", null, sarifCmd)))),
+    S.rechecks && S.rechecks.length ? h("div", { class: "card table-card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Re-checks"), h("div", { class: "sub" }, "reproducers re-run on newer code with threadscan recheck; no API usage"))),
+      h("div", { class: "table-wrap", style: "margin-top:8px" }, h("table", null, h("thead", null, h("tr", null, ["When", "Target", "Source run", "Commit", "Fixed", "Still present", "Unverified"].map(x => h("th", null, x)))),
+        h("tbody", null, S.rechecks.map(r => h("tr", null, h("td", null, when(r.at)), h("td", null, r.project), h("td", { class: "mono" }, r.source_run), h("td", { class: "mono" }, (r.commit || "—").slice(0, 12)),
+          h("td", { class: "num" }, (r.summary || {}).fixed ?? 0), h("td", { class: "num" }, (r.summary || {}).still_present ?? 0), h("td", { class: "num" }, (r.summary || {}).unverified ?? 0))))))) : null,
     h("div", { class: "card table-card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "All finished runs"), h("div", { class: "sub" }, done.length + " on this machine"))),
       done.length ? h("div", { class: "table-wrap", style: "margin-top:8px" }, h("table", null,
         h("thead", null, h("tr", null, ["Run", "Target", "Mode", "Verified", "Download"].map(x => h("th", null, x)))),
@@ -1118,7 +1122,8 @@ function renderDrawer() {
     note.value = t.note || "";
     body = [h("h4", null, "Note"), note, h("div", { style: "display:flex;gap:10px;align-items:center;margin-top:10px" }, h("button", { class: "btn-primary", type: "button", onclick: () => save({ note: note.value }) }, "Save note")),
       h("h4", null, "Activity"), (t.history || []).length ? h("div", { class: "timeline" }, [...t.history].reverse().map(e => h("div", { class: "ev-row" }, icon("history", "sm"),
-        h("div", null, e.changes.map(c => c.field === "status" ? "Status " + (STATUS_LABEL[c.from] || c.from) + " → " + (STATUS_LABEL[c.to] || c.to) : c.field === "assignee" ? "Assignee " + (c.from || "none") + " → " + (c.to || "none") : "Note edited").join(" · "),
+        h("div", null, e.by ? h("b", null, "Threadscan re-check: ") : null, e.changes.map(c => c.field === "status" ? "Status " + (STATUS_LABEL[c.from] || c.from) + " → " + (STATUS_LABEL[c.to] || c.to) : c.field === "assignee" ? "Assignee " + (c.from || "none") + " → " + (c.to || "none") : c.field === "severity" ? "Severity " + (c.from || "original") + " → " + (c.to || "original") : "Note edited").join(" · "),
+          e.reason ? h("div", { class: "muted", style: "font-size:12.5px" }, e.reason) : null,
           h("time", null, when(e.at)))))) : h("p", { class: "muted" }, "No triage changes yet. Status, assignee and notes are kept in runs/triage.json on this machine.")];
   }
   d.replaceChildren(
@@ -1168,6 +1173,7 @@ async function refresh() {
       [S.st, S.findings, S.lc, S.triage, S.seeds, S.plan] = await Promise.all([getJSON("/api/runs/" + id), getJSON("/api/runs/" + id + "/findings"), getJSON("/api/runs/" + id + "/lifecycle"),
         getJSON("/api/triage").then(t => t.issues || {}), getJSON("/api/runs/" + id + "/seeds").catch(() => ({ seeds: [], unassigned: 0 })),
         getJSON("/api/runs/" + id + "/plan").catch(() => null)]);
+      S.rechecks = await getJSON("/api/rechecks").catch(() => []);
       S.hist = S.st && S.st.project ? await getJSON("/api/projects/" + encodeURIComponent(S.st.project) + "/history").catch(() => []) : [];
     }
     if (!S.menu && !(document.activeElement && document.getElementById("drawer").contains(document.activeElement))) render();
