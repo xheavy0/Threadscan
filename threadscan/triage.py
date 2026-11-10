@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 STATUSES = ("open", "in_progress", "resolved", "risk_accepted", "false_positive")
+SEVERITIES = ("critical", "high", "medium", "low", "info")  # "" clears an override
 ID_RE = re.compile(r"^TS-[0-9a-f]{10}$")
 MAX_ASSIGNEE = 120
 MAX_NOTE = 4000
@@ -42,8 +43,11 @@ class TriageStore:
         so the Activity log tells them apart from a person's."""
         if not ID_RE.match(issue_id or ""):
             raise TriageError("malformed issue id")
-        if not isinstance(body, dict) or set(body) - {"status", "assignee", "note"}:
-            raise TriageError("body must be an object with status, assignee and/or note")
+        if not isinstance(body, dict) or set(body) - {"status", "assignee", "note", "severity"}:
+            raise TriageError("body must be an object with status, assignee, note and/or severity")
+        severity = body.get("severity")
+        if severity is not None and severity not in SEVERITIES + ("",):
+            raise TriageError(f"severity must be one of {', '.join(SEVERITIES)} or empty to use the original")
         status = body.get("status")
         assignee = body.get("assignee")
         note = body.get("note")
@@ -56,10 +60,10 @@ class TriageStore:
             data = self.load()
             entry = data.get(issue_id) or {"status": "open", "assignee": "", "note": "", "history": []}
             changes = []
-            for key, val in (("status", status), ("assignee", assignee), ("note", note)):
-                if val is not None and val != entry.get(key):
-                    changes.append({"field": key, "from": entry.get(key), "to": val if key != "note" else "(edited)"})
-                    entry[key] = val.strip() if isinstance(val, str) and key != "status" else val
+            for key, val in (("status", status), ("assignee", assignee), ("note", note), ("severity", severity)):
+                if val is not None and val != entry.get(key, "" if key == "severity" else None):
+                    changes.append({"field": key, "from": entry.get(key, "" if key == "severity" else None), "to": val if key != "note" else "(edited)"})
+                    entry[key] = val.strip() if isinstance(val, str) and key not in ("status", "severity") else val
             if changes:
                 now = time.time()
                 entry["updated"] = now

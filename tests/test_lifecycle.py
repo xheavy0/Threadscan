@@ -181,3 +181,13 @@ def test_seeds_and_policy_are_recorded(cfg, tmp_path):
     plan = json.loads((run_dir / "plan.json").read_text())
     assert plan["policy"]["scan"]["concurrency"] == cfg.scan.concurrency and "threat_model" in plan["policy"]
     assert plan["policy"]["verification"]["require_patch_differential"] is True
+
+
+def test_triage_severity_override(tmp_path):
+    store = TriageStore(tmp_path / "t.json")
+    e = store.update("TS-0123456789", {"severity": "low"})
+    assert e["severity"] == "low" and e["history"][-1]["changes"][0] == {"field": "severity", "from": "", "to": "low"}
+    e = store.update("TS-0123456789", {"severity": ""})
+    assert e["severity"] == ""
+    with pytest.raises(TriageError):
+        store.update("TS-0123456789", {"severity": "catastrophic"})

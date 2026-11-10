@@ -49,12 +49,16 @@ class RunData:
         summary = _load(run_dir / "summary.json", {})
         self.meta = summary.get("meta") or {}
         self.summary = summary
-        self.findings = sorted(_load(run_dir / "findings.json", []), key=lambda f: (SEVERITY_RANK.get(f.get("severity"), 9), f.get("component", ""), f.get("file", ""), f.get("line", 0)))
         self.lifecycle = _load(run_dir / "lifecycle.json", {})
         self.triage = triage or {}
-        for f in self.findings:
+        findings = _load(run_dir / "findings.json", [])
+        for f in findings:
             if not f.get("owasp"):
                 f["owasp"] = categorize(f.get("cwe"))
+            override = self.triage_of(f).get("severity")
+            if override and override != f.get("severity"):  # severity adjusted in triage; keep the original
+                f["original_severity"], f["severity"] = f.get("severity"), override
+        self.findings = sorted(findings, key=lambda f: (SEVERITY_RANK.get(f.get("severity"), 9), f.get("component", ""), f.get("file", ""), f.get("line", 0)))
 
     def triage_of(self, f: dict) -> dict:
         prev = (self.lifecycle.get("existing") or {}).get(f["id"])
@@ -107,6 +111,7 @@ def to_sarif(data: RunData) -> dict:
                 "owasp": f"{f['owasp']['id']} {f['owasp']['name']}" if f.get("owasp") else None,
                 "verification": v.get("status"), "patchCheck": v.get("patch_check"),
                 "lifecycle": data.lifecycle_of(f), "triageStatus": t.get("status"), "assignee": t.get("assignee") or None,
+                "originalSeverity": f.get("original_severity"),
             },
         }
         if t.get("status") in SUPPRESSED:
@@ -279,7 +284,8 @@ def to_html(data: RunData) -> str:
     for f in data.findings:
         t, v, r = data.triage_of(f), f.get("verification") or {}, f.get("reproducer") or {}
         parts.append(f"<section class='issue' id='{_e(f['id'])}'><div class='top'><span class='sevc {_e(f.get('severity'))}'>{SEV_LETTER.get(f.get('severity'), '?')}</span>"
-                     f"<span>{_e(str(f.get('severity', '')).capitalize())}</span><span class='mono'>{_e(f['id'])}</span>"
+                     f"<span>{_e(str(f.get('severity', '')).capitalize())}"
+                     + (f" (adjusted from {_e(f['original_severity'])})" if f.get("original_severity") else "") + f"</span><span class='mono'>{_e(f['id'])}</span>"
                      f"<span class='pill blue'>{_e(STATUS_LABEL.get(t.get('status'), t.get('status')))}</span>"
                      + (f"<span class='pill'>{_e(t.get('assignee'))}</span>" if t.get("assignee") else "") + "</div>"
                      f"<h3 style='margin-top:8px'>{_e(f['title'])}</h3><dl class='facts'>")

@@ -119,3 +119,15 @@ def test_export_endpoint_is_an_attachment_with_current_triage(tmp_path):
         assert _get(port, "/api/runs/..%2F..%2Fx/export/csv")[0] == 404
     finally:
         srv.shutdown()
+
+
+def test_severity_override_flows_into_exports(tmp_path):
+    _, run, f = make_run(tmp_path, severity="critical")
+    data = RunData(run, {f["id"]: {"status": "open", "severity": "low"}})
+    assert data.findings[0]["severity"] == "low" and data.findings[0]["original_severity"] == "critical"
+    res = to_sarif(data)["runs"][0]["results"][0]
+    assert res["level"] == "note" and res["properties"]["originalSeverity"] == "critical"
+    assert "adjusted from critical" in to_html(data)
+    assert list(csv.DictReader(io.StringIO(to_csv(data))))[0]["severity"] == "low"
+    plain = RunData(run, {})
+    assert plain.findings[0]["severity"] == "critical" and "original_severity" not in plain.findings[0]

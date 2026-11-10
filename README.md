@@ -198,9 +198,12 @@ used. All of it is self-hosted, so the page works offline and loads nothing from
 - **Saved views** (Issues → Views) keep filter, group and search combinations per browser.
 - The issue drawer can copy or download the reproducer (`.sh`) and the patch (`.patch`).
 
-**Triage.** Status (Open, In progress, Resolved, Risk accepted, False positive), assignee and
-a note per issue are stored in `runs/triage.json`, keyed by issue id, so they follow an issue
-across runs. Resolved, risk-accepted and false-positive issues leave the open counts.
+**Triage.** Status (Open, In progress, Resolved, Risk accepted, False positive), assignee, a
+note and an optional severity override per issue are stored in `runs/triage.json`, keyed by
+issue id, so they follow an issue across runs. An adjusted severity is used everywhere
+(tables, graph, exports, SARIF level) and the original stays visible ("was high"). The
+drawer's **Copy as GitHub issue** puts a ready Markdown issue (title, location, CWE/OWASP,
+verification, description, reproducer, verified patch) on the clipboard; nothing is posted. Resolved, risk-accepted and false-positive issues leave the open counts.
 
 ## How it works
 

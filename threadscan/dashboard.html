@@ -524,11 +524,40 @@ function lifeTag(f) {
 }
 function owaspOf(f) { return f.owasp ? f.owasp.id : "unmapped"; }
 function owaspName(id) { if (id === "unmapped") return "Not mapped"; const o = S.owasp.find(x => x.id === id); return o ? id + " " + o.name : id; }
+function applyOverrides() {
+  for (const f of S.findings) {
+    if (f.original_severity) { f.severity = f.original_severity; delete f.original_severity; }
+    const o = triageOf(f).severity;
+    if (o && o !== f.severity) { f.original_severity = f.severity; f.severity = o; }
+  }
+}
+function fence(text, lang) {
+  const longest = Math.max(2, ...((text || "").match(/`+/g) || [""]).map(x => x.length));
+  const t = "`".repeat(longest + 1);
+  return t + (lang || "") + "\n" + (text || "").replace(/\n+$/, "") + "\n" + t;
+}
+function githubIssue(f) {
+  const v = f.verification || {}, u = v.unpatched_run || {}, r = f.reproducer || {};
+  const lines = [
+    "**Severity:** " + cap(f.severity) + (f.original_severity ? " (adjusted from " + f.original_severity + ")" : "") + " · **Location:** `" + f.location + "` · **Component:** `" + f.component + "`",
+    "**CWE:** " + (f.cwe || "n/a") + " · **OWASP Top 10:2021:** " + (f.owasp ? f.owasp.id + " " + f.owasp.name : "not mapped"),
+    "",
+    "Verified by Threadscan (run `" + S.st.run_id + "`): the reproducer " + (u.proof_line_seen ? "demonstrated the issue" : "ran") + " in an offline container" +
+      (v.patch_check === "fixed" ? " and stopped once the proposed patch was applied." : "."),
+    "", "### Description", "", f.description || "", "", "### Impact", "", f.impact || "",
+    "", "### Reproducer", "", fence(r.script, "bash"),
+    ...(r.files || []).flatMap(x => ["", "`" + x.path + "`", "", fence(x.content)]),
+    ...(f.patch ? ["", "### Proposed patch" + (v.patch_check === "fixed" ? " (verified)" : ""), "", fence(f.patch, "diff")] : []),
+    "", "_Threadscan issue " + f.id + "_",
+  ];
+  return { title: "[" + cap(f.severity) + "] " + f.title, body: lines.join("\n") };
+}
 async function saveTriage(id, body) {
   const r = await fetch("/api/triage/" + encodeURIComponent(id), { method: "POST", headers: { "Content-Type": "application/json", "X-Threadscan-Request": "1" }, body: JSON.stringify(body) });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "save failed");
   S.triage[id] = data;
+  applyOverrides();
   return data;
 }
 
@@ -761,7 +790,8 @@ function issueRow(f) {
   const t = triageOf(f);
   return h("tr", { class: "click" + (S.selected === f.id ? " sel" : ""), tabindex: "0", onclick: () => openIssue(f.id), onkeydown: e => { if (e.key === "Enter") openIssue(f.id); } },
     h("td", null, sevLabel(f.severity)),
-    h("td", null, h("div", { class: "t-title", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, f.title, lifeTag(f)), h("div", { class: "t-sub" }, f.id)),
+    h("td", null, h("div", { class: "t-title", style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" }, f.title, lifeTag(f),
+      f.original_severity ? h("span", { class: "tag", title: "Severity adjusted in triage" }, "was " + f.original_severity) : null), h("div", { class: "t-sub" }, f.id)),
     h("td", { class: "mono" }, f.component),
     h("td", { class: "mono" }, f.location),
     h("td", null, f.owasp ? h("span", { class: "tag", title: f.owasp.name }, f.owasp.id) : h("span", { class: "muted" }, "—")),
@@ -1086,6 +1116,11 @@ function renderDrawer() {
   const v = f.verification || {}, repro = f.reproducer || {}, t = triageOf(f);
   const statusSel = h("select", { class: "select", "aria-label": "Status" }, Object.keys(STATUS_LABEL).map(k => h("option", { value: k }, STATUS_LABEL[k])));
   statusSel.value = t.status;
+  const original = f.original_severity || f.severity;
+  const sevSel = h("select", { class: "select", "aria-label": "Severity", title: "Adjust severity (the original is kept)" },
+    h("option", { value: "" }, "Severity: " + cap(original) + " (original)"), SEVS.filter(x => x !== original).map(x => h("option", { value: x }, "Severity: " + cap(x))));
+  sevSel.value = t.severity && t.severity !== original ? t.severity : "";
+  sevSel.addEventListener("change", () => save({ severity: sevSel.value }));
   const assignee = h("input", { class: "input", placeholder: "Assignee", value: t.assignee || "", "aria-label": "Assignee", maxlength: "120" });
   const saved = h("span", { class: "saved", role: "status" });
   async function save(extra) {
@@ -1128,10 +1163,12 @@ function renderDrawer() {
   }
   d.replaceChildren(
     h("div", { class: "d-head" },
-      h("div", { class: "d-top" }, h("span", { class: "d-meta" }, sevLabel(f.severity), h("span", { class: "mono" }, f.id), lifeTag(f)), h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: closeIssue }, icon("x"))),
+      h("div", { class: "d-top" }, h("span", { class: "d-meta" }, sevLabel(f.severity), f.original_severity ? h("span", { class: "tag" }, "adjusted from " + f.original_severity) : null, h("span", { class: "mono" }, f.id), lifeTag(f)), h("button", { class: "icon-btn", type: "button", "aria-label": "Close", onclick: closeIssue }, icon("x"))),
       h("h2", null, f.title),
       h("div", { class: "d-meta" }, h("span", { class: "mono" }, f.location), h("span", null, f.component)),
-      h("div", { class: "d-ctrl" }, statusSel, assignee, saved),
+      h("div", { class: "d-ctrl" }, statusSel, sevSel, assignee,
+        h("button", { class: "btn-ghost", type: "button", title: "Copy a Markdown issue (title on the first line) to paste into GitHub; nothing is posted",
+          onclick: e => { const gi = githubIssue(f); copyText(gi.title + "\n\n" + gi.body, e.currentTarget); } }, icon("copy", "sm"), "Copy as GitHub issue"), saved),
       h("div", { class: "d-tabs", role: "tablist" }, tabs.map(([k, l]) => h("button", { type: "button", role: "tab", "aria-selected": String(S.dtab === k), onclick: () => { S.dtab = k; renderDrawer(); } }, l)))),
     h("div", { class: "d-body" }, body));
   d.classList.add("open"); scrim.classList.add("open");
@@ -1174,6 +1211,7 @@ async function refresh() {
         getJSON("/api/triage").then(t => t.issues || {}), getJSON("/api/runs/" + id + "/seeds").catch(() => ({ seeds: [], unassigned: 0 })),
         getJSON("/api/runs/" + id + "/plan").catch(() => null)]);
       S.rechecks = await getJSON("/api/rechecks").catch(() => []);
+      applyOverrides();
       S.hist = S.st && S.st.project ? await getJSON("/api/projects/" + encodeURIComponent(S.st.project) + "/history").catch(() => []) : [];
     }
     if (!S.menu && !(document.activeElement && document.getElementById("drawer").contains(document.activeElement))) render();

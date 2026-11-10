@@ -21,7 +21,7 @@ the lab machine (see LAB-TEST.md).
   the evidence; still reproducing → stays open (re-opened if it had been marked Resolved);
   cannot run → left alone and reported. Results in `runs/rechecks/`, visible in the issue's
   Activity.
-- [ ] **T2 Severity override and "Copy as GitHub issue"**: triage can adjust an issue's
+- [x] **T2 Severity override and "Copy as GitHub issue"**: triage can adjust an issue's
   severity (the original is kept and shown); dashboard, exports and SARIF use the adjusted
   one. The drawer copies a ready Markdown issue body (never posts anything).
 - [ ] **T3 Verified-fixes patch bundle**: one `verified-fixes.patch` with every patch the gate
