@@ -29,7 +29,7 @@ the lab machine (see LAB-TEST.md).
 - [x] **T4 `threadscan init <repo>`**: scaffold `targets/<name>/` (project.yaml, Dockerfile,
   threat_model.md) by detecting Maven, Gradle, npm/pnpm/yarn, Python, Go, Rust, .NET; never
   overwrites, never touches the target repo.
-- [ ] **T5 `threadscan seeds <target>`**: fetch seed input: the latest CodeQL SARIF per
+- [x] **T5 `threadscan seeds <target>`**: fetch seed input: the latest CodeQL SARIF per
   language from GitHub code scanning (read-only `gh api`), plus gitleaks (`--redact`) and
   osv-scanner when installed, into `targets/<name>/seeds/`.
 - [ ] **T6 `threadscan watch <target>`**: poll the target repo; when HEAD moves, run a diff

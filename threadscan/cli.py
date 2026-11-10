@@ -163,6 +163,26 @@ def cmd_init(a) -> int:
     return 0
 
 
+def cmd_seeds(a) -> int:
+    from threadscan.repo import resolve_repo
+    from threadscan.seeds_fetch import fetch_all
+
+    cfg = load_project(a.target, a.repo)
+    repo = resolve_repo(cfg, Path(a.cache_dir).resolve(), offline=a.offline)
+    tools = set(a.tool or ["codeql", "gitleaks", "osv"])
+    outcomes = fetch_all(cfg.target_dir, repo, tools, a.github, a.ref)
+    for o in outcomes:
+        print(f"[{o.status:<7}] {o.tool:<8} {o.detail}" + (f"  ->  {o.path}" if o.path else ""))
+    configured = {s.path.resolve() for s in cfg.seeds}
+    missing = [o for o in outcomes if o.path and o.path.resolve() not in configured]
+    if missing:
+        print("add these to project.yaml so scans use them:")
+        print("seeds:")
+        for o in missing:
+            print(f"  - tool: {o.tool}\n    path: seeds/{o.path.name}")
+    return 1 if any(o.status == "failed" for o in outcomes) else 0
+
+
 def cmd_export(a) -> int:
     from threadscan.exporters import FORMATS, export
     from threadscan.triage import TriageStore
@@ -231,6 +251,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--name", help="target name (default: the repository folder name)")
     p.add_argument("--targets-dir", default="targets")
     p.set_defaults(fn=cmd_init)
+
+    p = sub.add_parser("seeds", help="fetch seed input: CodeQL SARIF from GitHub code scanning, gitleaks, osv-scanner")
+    _add_target_args(p)
+    p.add_argument("--tool", action="append", choices=["codeql", "gitleaks", "osv"], help="only these tools (repeatable; default: all)")
+    p.add_argument("--github", help="owner/repo for CodeQL (default: from the repo's origin remote)")
+    p.add_argument("--ref", help="git ref for CodeQL analyses, e.g. refs/heads/main (default: the checkout's branch)")
+    p.add_argument("--cache-dir", default=".cache")
+    p.add_argument("--offline", action="store_true", help="do not fetch a remote repo")
+    p.set_defaults(fn=cmd_seeds)
 
     p = sub.add_parser("export", help="export a run's verified issues: SARIF, CSV, JSON or a self-contained HTML report")
     p.add_argument("run", help="run directory, or a run id inside --runs-dir")

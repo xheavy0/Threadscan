@@ -121,6 +121,14 @@ the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by 
 `--model` to change), and runs the verification driver offline. Results are printed and
 saved to `runs/doctor-<time>/doctor.json`.
 
+### Seeds
+
+`threadscan seeds <target> [--tool codeql|gitleaks|osv] [--github owner/repo] [--ref REF]`
+collects seed input into `targets/<name>/seeds/`: the newest CodeQL analysis per language from
+GitHub code scanning (read-only `gh api`; the repository comes from the checkout's `origin`
+remote), gitleaks with `--redact`, and osv-scanner, each only when available. It prints the
+`seeds:` lines to add to `project.yaml` when they are missing.
+
 ### Re-checking fixes
 
 `threadscan recheck <target> [--run ID] [--all]` rebuilds the target image from the current
