@@ -215,17 +215,17 @@ def _font_face(family: str, file: str, weight: str) -> str:
 CSS = """
 :root{--text:#1d2433;--text2:#3b4458;--muted:#6b7385;--line:#e4e7ec;--bg2:#f7f8fa;--bg3:#f1f3f6;--primary:#1b5cff;--psoft:#eaf0ff;
 --cfg:#d1242f;--cbg:#ffe4e6;--hfg:#c2410c;--hbg:#ffedd5;--mfg:#a16207;--mbg:#fef3c7;--lfg:#475467;--lbg:#eef1f5;--ok:#12804a;--okbg:#e6f6ec;--warn:#a15c00;--warnbg:#fff4e0}
-*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--text);font:14px/1.55 'DM Sans','Segoe UI',system-ui,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--text);font:14px/1.55 'Rubik','Segoe UI',system-ui,sans-serif}
 .wrap{max-width:1040px;margin:0 auto;padding:36px 32px 64px}
-h1,h2,h3{font-family:'Poppins','DM Sans',sans-serif;font-weight:500;margin:0;color:var(--text)}
+h1,h2,h3{font-family:'Rubik','Segoe UI',sans-serif;font-weight:500;margin:0;color:var(--text)}
 h1{font-size:28px;letter-spacing:-.01em}h2{font-size:20px;margin:34px 0 12px}h3{font-size:17px;line-height:1.35}
-code,pre,.mono{font-family:'JetBrains Mono',Consolas,monospace}
+code,pre,.mono{font-family:'Fira Code',Consolas,monospace}
 .head{display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);padding-bottom:18px}
 .head svg{width:44px;height:44px;flex-shrink:0}.sub{color:var(--muted);font-size:13.5px;margin-top:3px}
 .meta{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:20px}
 .meta div{background:#fff;padding:12px 14px}.meta dt{font-size:12px;color:var(--muted)}.meta dd{margin:2px 0 0;word-break:break-word}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
-.kpi{border:1px solid var(--line);border-radius:12px;padding:14px 16px}.kpi b{display:block;font:500 28px 'Poppins',sans-serif}.kpi span{color:var(--muted);font-size:13px}
+.kpi{border:1px solid var(--line);border-radius:12px;padding:14px 16px}.kpi b{display:block;font:500 28px 'Rubik',sans-serif}.kpi span{color:var(--muted);font-size:13px}
 .sevc{display:inline-flex;width:22px;height:22px;border-radius:50%;align-items:center;justify-content:center;font-size:11px;font-weight:700;vertical-align:middle}
 .critical{background:var(--cbg);color:var(--cfg)}.high{background:var(--hbg);color:var(--hfg)}.medium{background:var(--mbg);color:var(--mfg)}.low,.info{background:var(--lbg);color:var(--lfg)}
 .counts span{margin-right:12px;white-space:nowrap}
@@ -276,8 +276,7 @@ def to_html(data: RunData) -> str:
     meta, s = data.meta, data.summary
     mark = (STATIC / "threadscan.svg").read_text(encoding="utf-8") if (STATIC / "threadscan.svg").is_file() else ""
     mark = mark[mark.find("<svg"):] if "<svg" in mark else ""
-    fonts = "".join([_font_face("DM Sans", "dm-sans-latin-wght-normal.woff2", "100 1000"), _font_face("Poppins", "poppins-latin-500-normal.woff2", "500"),
-                     _font_face("JetBrains Mono", "jetbrains-mono-latin-400-normal.woff2", "400")])
+    fonts = "".join([_font_face("Rubik", "rubik-latin-wght-normal.woff2", "300 900"), _font_face("Fira Code", "fira-code-latin-wght-normal.woff2", "300 700")])
     sev_counts = {sv: sum(1 for f in data.findings if f.get("severity") == sv) for sv in SEVERITY_RANK}
     open_n = sum(1 for f in data.findings if data.triage_of(f).get("status") not in ("resolved", "risk_accepted", "false_positive"))
     lc = data.lifecycle or {}

@@ -10,19 +10,16 @@
 /* Security-console design system modelled on Wiz's product UI: white icon rail with labels,
    white top bar with a scope selector and search pill, rounded filter pills (blue when
    active), GROUP BY segmented control, round letter severity badges, pill statuses,
-   dotted-canvas graph. Type: DM Sans (text) and Poppins (titles), the open fonts Wiz uses,
-   plus JetBrains Mono; icons: Lucide (ISC). All self-hosted; nothing loads from another host. */
-@font-face { font-family: "DM Sans"; src: url(/static/fonts/dm-sans.woff2) format("woff2"); font-weight: 100 1000; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url(/static/fonts/poppins-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url(/static/fonts/poppins-500.woff2) format("woff2"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Poppins"; src: url(/static/fonts/poppins-600.woff2) format("woff2"); font-weight: 600; font-display: swap; }
-@font-face { font-family: "JetBrains Mono"; src: url(/static/fonts/jetbrains-mono-400.woff2) format("woff2"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "JetBrains Mono"; src: url(/static/fonts/jetbrains-mono-500.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+   dotted-canvas graph. Type: Rubik and Fira Code, the open fonts Wiz's product UI uses;
+   icons: Lucide (ISC). All self-hosted; nothing loads from another host.
+   Dark mode is neutral graphite; blue is kept for the accent only. */
+@font-face { font-family: "Rubik"; src: url(/static/fonts/rubik.woff2) format("woff2"); font-weight: 300 900; font-display: swap; }
+@font-face { font-family: "Fira Code"; src: url(/static/fonts/fira-code.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
 
 :root {
-  --sans: "DM Sans", "Segoe UI", system-ui, sans-serif;
-  --head: "Poppins", "DM Sans", "Segoe UI", sans-serif;
-  --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --sans: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --head: "Rubik", "Segoe UI", system-ui, sans-serif;
+  --mono: "Fira Code", "Cascadia Code", Consolas, monospace;
   --bg: #ffffff; --bg-2: #f7f8fa; --bg-3: #f1f3f6; --card: #ffffff;
   --line: #e4e7ec; --line-2: #d0d5dd;
   --text: #1d2433; --text-2: #3b4458; --muted: #6b7385;
@@ -33,20 +30,20 @@
   --l-fg: #475467; --l-bg: #eef1f5; --l-bar: #98a2b3;
   --i-fg: #475467; --i-bg: #f2f4f7; --i-bar: #c0c7d2;
   --ok-fg: #12804a; --ok-bg: #e6f6ec; --warn-fg: #a15c00; --warn-bg: #fff4e0; --bad-fg: #c4232f; --bad-bg: #fde8ea;
-  --node-comp: #2a3550; --node-file: #8b95a7; --node-owasp: #7c5cff; --node-fix: #12a36b;
+  --node-comp: #2a3550; --node-file: #8b95a7; --node-owasp: #7c5cff; --node-fix: #12a36b; --chart-fill: #1b5cff;
   --shadow-lg: 0 20px 48px rgba(16, 24, 40, .18);
   color-scheme: light;
 }
 :root.dark {
-  --bg: #0f1424; --bg-2: #141a2c; --bg-3: #1a2135; --card: #151b2d;
-  --line: #262e45; --line-2: #333d58;
-  --text: #e7eaf2; --text-2: #c3c9d8; --muted: #98a1b5;
-  --primary: #5b8bff; --primary-2: #7aa2ff; --primary-soft: #1c2850;
-  --c-fg: #ff8a8f; --c-bg: #3b1820; --h-fg: #ffa36b; --h-bg: #3a2216; --m-fg: #f5c84b; --m-bg: #352c10;
-  --l-fg: #b6bfcf; --l-bg: #242c40; --i-fg: #b6bfcf; --i-bg: #20283b;
-  --ok-fg: #4fd08f; --ok-bg: #12301f; --warn-fg: #ffbb55; --warn-bg: #36280e; --bad-fg: #ff7f88; --bad-bg: #3a1820;
-  --node-comp: #c9d2e6; --node-file: #6d7891;
-  --shadow-lg: 0 20px 48px rgba(0, 0, 0, .55);
+  --bg: #111113; --bg-2: #161618; --bg-3: #1f1f22; --card: #18181b;
+  --line: #2a2a2e; --line-2: #3a3a40;
+  --text: #ececee; --text-2: #c6c6cc; --muted: #8f8f98;
+  --primary: #6b96ff; --primary-2: #8aadff; --primary-soft: #24242a;
+  --c-fg: #ff8a8f; --c-bg: #3a1c20; --h-fg: #ffa36b; --h-bg: #3a2418; --m-fg: #f5c84b; --m-bg: #352d12;
+  --l-fg: #c0c0c8; --l-bg: #26262b; --i-fg: #c0c0c8; --i-bg: #222226;
+  --ok-fg: #4fd08f; --ok-bg: #14291e; --warn-fg: #ffbb55; --warn-bg: #33270f; --bad-fg: #ff7f88; --bad-bg: #36191d;
+  --node-comp: #d4d4da; --node-file: #75757f; --chart-fill: #9a9aa3;
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 
@@ -98,7 +95,7 @@ svg.i.sm { width: 15px; height: 15px; }
 /* ---------- page ---------- */
 .content { padding: 22px 28px 64px; width: 100%; max-width: 1480px; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.page-head h1 { font: 500 28px/1.25 var(--head); letter-spacing: -.01em; color: var(--text); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { font: 500 27px/1.25 var(--head); letter-spacing: -.005em; color: var(--text); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .page-sub { color: var(--muted); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13.5px; }
 .page-sub code { font-size: 12.5px; color: var(--text-2); }
 
@@ -456,7 +453,7 @@ function storedTheme() { try { return localStorage.getItem("threadscan-theme"); 
 let theme = storedTheme() || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 function applyTheme() {
   document.documentElement.classList.toggle("dark", theme === "dark");
-  document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#0f1424" : "#ffffff");
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", theme === "dark" ? "#111113" : "#ffffff");
   const b = document.getElementById("theme");
   b.replaceChildren(h("span", { class: "ico" }, icon(theme === "dark" ? "sun" : "moon")), theme === "dark" ? "Light" : "Dark");
 }
@@ -682,7 +679,7 @@ function lineChart(points, w, hgt) {
   const x = i => w * i / (points.length - 1), y = v => padT + (hgt - padT - padB) * (1 - v / max);
   const id = "lg" + (++chartSeq);
   const defs = svgEl("defs"), grad = svgEl("linearGradient", { id, x1: 0, y1: 0, x2: 0, y2: 1 });
-  grad.append(svgEl("stop", { offset: "0", "stop-color": "#1b5cff", "stop-opacity": ".22" }), svgEl("stop", { offset: "1", "stop-color": "#1b5cff", "stop-opacity": "0" }));
+  grad.append(svgEl("stop", { offset: "0", style: "stop-color:var(--chart-fill);stop-opacity:.22" }), svgEl("stop", { offset: "1", style: "stop-color:var(--chart-fill);stop-opacity:0" }));
   defs.append(grad); svg.append(defs);
   for (const t of [0, max]) svg.append(svgEl("line", { x1: 0, x2: w, y1: y(t), y2: y(t), stroke: "var(--line)", "vector-effect": "non-scaling-stroke" }));
   const d = points.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");

@@ -179,8 +179,8 @@ of its own: use `--full`.
 `http://127.0.0.1:8765/`. Its design follows Wiz's product UI: a white icon rail with
 labels, a white top bar with a run selector and a search pill (Ctrl K), rounded filter pills
 that turn blue when active, a GROUP BY control, round letter severity badges (C/H/M/L),
-pill statuses and a dotted-canvas graph. Type is DM Sans and Poppins, the open fonts Wiz
-uses, plus JetBrains Mono; icons are Lucide (ISC). Wiz's own icon set and logo are not
+pill statuses and a dotted-canvas graph. Type is Rubik and Fira Code, the open fonts Wiz's
+product UI uses; icons are Lucide (ISC). Wiz's own icon set and logo are not
 used. All of it is self-hosted, so the page works offline and loads nothing from another host.
 
 - **Boards:** open issues by severity, verified issues over time with the change since the

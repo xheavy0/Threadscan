@@ -90,7 +90,7 @@ def test_dashboard_api(runs):
             status, body = _req(port, "GET", path)
             assert status == 200 and len(body) > 500, path
         assert _req(port, "GET", "/static/fonts/../../dashboard.py")[0] == 404
-        assert _req(port, "GET", "/static/fonts/LICENSE-Inter.txt")[0] == 404
+        assert _req(port, "GET", "/static/fonts/LICENSE-Rubik.txt")[0] == 404
     finally:
         srv.shutdown()
 
@@ -101,7 +101,7 @@ def test_dashboard_never_references_a_font_cdn():
     for host in ("fonts.googleapis", "fonts.gstatic", "cdn.", "unpkg", "jsdelivr", "http://", "https://"):
         assert host not in html, host
     # the design system's own assets, all served from this origin
-    for asset in ("/static/fonts/dm-sans.woff2", "/static/fonts/poppins-500.woff2", "/static/threadscan.svg"):
+    for asset in ("/static/fonts/rubik.woff2", "/static/fonts/fira-code.woff2", "/static/threadscan.svg"):
         assert asset in html and asset in dashboard.STATIC_FILES, asset
 
 

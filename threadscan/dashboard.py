@@ -31,12 +31,9 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 STATIC_FILES = {
     "/static/threadscan.svg": ("threadscan.svg", "image/svg+xml"),
     "/favicon.svg": ("threadscan.svg", "image/svg+xml"),
-    "/static/fonts/dm-sans.woff2": ("fonts/dm-sans-latin-wght-normal.woff2", "font/woff2"),
-    "/static/fonts/poppins-400.woff2": ("fonts/poppins-latin-400-normal.woff2", "font/woff2"),
-    "/static/fonts/poppins-500.woff2": ("fonts/poppins-latin-500-normal.woff2", "font/woff2"),
-    "/static/fonts/poppins-600.woff2": ("fonts/poppins-latin-600-normal.woff2", "font/woff2"),
-    "/static/fonts/jetbrains-mono-400.woff2": ("fonts/jetbrains-mono-latin-400-normal.woff2", "font/woff2"),
-    "/static/fonts/jetbrains-mono-500.woff2": ("fonts/jetbrains-mono-latin-500-normal.woff2", "font/woff2"),
+    # Rubik and Fira Code: the fonts Wiz's product UI uses (both SIL OFL).
+    "/static/fonts/rubik.woff2": ("fonts/rubik-latin-wght-normal.woff2", "font/woff2"),
+    "/static/fonts/fira-code.woff2": ("fonts/fira-code-latin-wght-normal.woff2", "font/woff2"),
 }
 CSP = (
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self'; "

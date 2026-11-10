@@ -17,8 +17,8 @@ Threadmap: a white icon rail with labels, a white top bar with a scope selector 
 pill, rounded filter pills (blue `#1b5cff` when active), a GROUP BY segmented control, round
 letter severity badges (C `#d1242f` on `#ffe4e6`, H `#c2410c` on `#ffedd5`, M `#a16207` on
 `#fef3c7`, L `#475467` on `#eef1f5`), pill statuses, cards with a title and grey subtitle,
-and a dotted-canvas graph. Type: DM Sans (text) and Poppins (titles), the open fonts Wiz's
-site uses, plus JetBrains Mono; Latin subsets self-hosted in `threadscan/static/fonts/`
+and a dotted-canvas graph. Dark mode uses neutral graphite surfaces (`#111113` / `#18181b`), not navy; blue stays as the accent only. Type: Rubik (all UI text) and Fira Code (code), the open fonts Wiz's product UI uses
+(checked on app.wiz.io); Latin subsets self-hosted in `threadscan/static/fonts/`
 (SIL OFL 1.1, licences beside them). Icons: Lucide (ISC, `threadscan/static/LICENSE-Lucide.txt`),
 inlined as SVG; Wiz's own icon set, name and logo are not used. No font or icon CDN.
 The Threadscan mark keeps it recognisably a Thread app.
