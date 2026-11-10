@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+
+# Scan output: reports describe vulnerabilities in private code. Never commit.
+runs/
+.cache/
+
+# Secrets never live in this repo.
+.env
+.env.*
+*.key
+*.pem
+
+# Seed files exported from GitHub code scanning etc. belong to the target, not here.
+targets/*/seeds/

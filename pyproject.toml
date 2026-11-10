@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vulnscan"
+version = "0.1.0"
+description = "Standalone AI vulnerability scanner: builds a target in Docker, scans it offline with Claude, keeps only findings whose reproducer runs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+# The host side needs PyYAML only. The Claude Agent SDK is installed inside the
+# scan image (docker/overlay.Dockerfile), never on the host.
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+vulnscan = "vulnscan.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["vulnscan*"]
+
+[tool.setuptools.package-data]
+vulnscan = ["dashboard.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
