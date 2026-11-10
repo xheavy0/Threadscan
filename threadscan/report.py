@@ -72,6 +72,12 @@ def _usd(v) -> str:
     return "not reported" if v is None else f"${v:,.2f}"
 
 
+def _cost(v, auth) -> str:
+    if auth == "subscription" and v is not None:
+        return f"{_usd(v)} at API prices; not billed, counts against your subscription limits"
+    return _usd(v)
+
+
 def _run_evidence(label: str, ev: dict | None) -> list[str]:
     if not ev:
         return [f"- {label}: not run"]
@@ -93,18 +99,20 @@ def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
         f"- Mode: {mode}",
         f"- Target commit: `{meta.get('commit') or 'unknown'}`",
         f"- Model: `{meta.get('model')}`",
+        "- Auth: " + ("your Claude subscription (Claude Code token)" if meta.get("auth") == "subscription" else "Anthropic API key"),
     ]
     if meta.get("dry_run"):
         out += ["- **Dry run:** no image was built, no agent ran and no reproducer was executed."]
     out += ["", "## Summary", "", "| | |", "|---|---|"]
     rows = [
-        ("Components scanned", f"{summary['components_scanned']} of {summary['components_total']} ({summary['components_failed']} failed)"),
+        ("Components scanned", f"{summary['components_scanned']} of {summary['components_total']} ({summary['components_failed']} failed"
+         + (f", {len(summary['components_skipped'])} not started: usage limit" if summary.get("components_skipped") else "") + ")"),
         ("Candidates reported by agents", summary["candidates"]),
         ("Verified findings", summary["verified"]),
         ("Dropped (unproven or invalid)", summary["dropped"]),
         ("Seed findings given to agents", summary["seeds"]["assigned"]),
         ("Tokens in / out", f"{summary['tokens']['input']:,} / {summary['tokens']['output']:,}" if summary["tokens"]["reported"] else "not reported"),
-        ("Cost", _usd(summary["cost_usd"])),
+        ("Cost", _cost(summary["cost_usd"], meta.get("auth"))),
     ]
     out += [f"| {k} | {v} |" for k, v in rows]
     if summary["by_severity"]:
@@ -136,6 +144,19 @@ def render_markdown(meta: dict, findings: list[dict], summary: dict) -> str:
             out.append(f"- Note: {n}")
         out += ["", "**Proposed patch**", "", _fence(f["patch"], "diff") if f["patch"] else "_none_", ""]
 
+    if summary.get("components_skipped"):
+        out += [
+            "## Not scanned: usage limit reached",
+            "",
+            "The subscription's usage limit was reached, so these components were not started:",
+            "",
+            *[f"- `{n}`" for n in summary["components_skipped"]],
+            "",
+            "Resume once the limit resets:",
+            "",
+            _fence(summary.get("resume_command", ""), "bash"),
+            "",
+        ]
     out += ["## Dropped candidates", ""]
     if summary["dropped"]:
         out += ["These were not proven and are not findings. Counts by reason:", "", "| Reason | Count |", "|---|---|"]

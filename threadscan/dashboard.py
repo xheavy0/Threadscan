@@ -24,7 +24,6 @@ STATIC_FILES = {
     "/static/threadscan.svg": ("threadscan.svg", "image/svg+xml"),
     "/favicon.svg": ("threadscan.svg", "image/svg+xml"),
     "/static/fonts/inter.woff2": ("fonts/inter-latin-wght-normal.woff2", "font/woff2"),
-    "/static/fonts/source-serif-4.woff2": ("fonts/source-serif-4-latin-wght-normal.woff2", "font/woff2"),
     "/static/fonts/jetbrains-mono-400.woff2": ("fonts/jetbrains-mono-latin-400-normal.woff2", "font/woff2"),
     "/static/fonts/jetbrains-mono-500.woff2": ("fonts/jetbrains-mono-latin-500-normal.woff2", "font/woff2"),
 }
@@ -72,7 +71,7 @@ def run_status(run_dir: Path) -> dict:
                 c["progress"] = {k: prog.get(k) for k in ("turns", "tool_calls", "last", "updated", "state")}
     summary = _load(run_dir / "summary.json")
     if summary:
-        st["summary"] = {k: summary.get(k) for k in ("components_scanned", "components_failed", "candidates", "verified", "dropped", "dropped_by_reason", "by_severity", "tokens", "cost_usd", "seeds")}
+        st["summary"] = {k: summary.get(k) for k in ("components_scanned", "components_failed", "candidates", "verified", "dropped", "dropped_by_reason", "by_severity", "tokens", "cost_usd", "seeds", "components_skipped", "limit_reached", "resume_command")}
     return st
 
 

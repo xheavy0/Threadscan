@@ -19,7 +19,7 @@ def write_json(path: Path, obj) -> None:
 
 
 class StatusTracker:
-    def __init__(self, run_dir: Path, run_id: str, project: str, mode: str, base: str | None, dry_run: bool):
+    def __init__(self, run_dir: Path, run_id: str, project: str, mode: str, base: str | None, dry_run: bool, auth: str = "api_key"):
         self.path = run_dir / "status.json"
         self.lock = threading.Lock()
         now = time.time()
@@ -29,6 +29,7 @@ class StatusTracker:
             "mode": mode,
             "base": base,
             "dry_run": dry_run,
+            "auth": auth,
             "started": now,
             "updated": now,
             "finished": None,

@@ -26,6 +26,9 @@ from pathlib import Path
 GATEWAY_ALIAS = "threadscan-gw"
 GATEWAY_PORT = 8080
 PLACEHOLDER_KEY = "sk-placeholder-the-gateway-injects-the-real-key"
+PLACEHOLDER_OAUTH = "threadscan-placeholder-the-gateway-injects-the-real-token"
+# Which host variable holds the real credential, per auth mode. Only the gateway gets it.
+CREDENTIAL_ENV = {"api_key": "ANTHROPIC_API_KEY", "subscription": "CLAUDE_CODE_OAUTH_TOKEN"}
 IN_DIR = "/threadscan/in"
 OUT_DIR = "/threadscan/out"
 AGENT_PY = "/opt/threadscan/venv/bin/python"
@@ -36,13 +39,25 @@ HARDENING = ["--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
 # Claude Code: no telemetry, no auto-update, no error reporting; only the API calls.
 AGENT_ENV = {
     "ANTHROPIC_BASE_URL": f"http://{GATEWAY_ALIAS}:{GATEWAY_PORT}",
-    "ANTHROPIC_API_KEY": PLACEHOLDER_KEY,
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "DISABLE_TELEMETRY": "1",
     "DISABLE_ERROR_REPORTING": "1",
     "DISABLE_AUTOUPDATER": "1",
     "DISABLE_BUG_COMMAND": "1",
 }
+
+
+def agent_env(auth: str) -> dict[str, str]:
+    """Scan-container environment: a placeholder credential of the right kind, never the real one.
+
+    With a subscription the container must NOT have ANTHROPIC_API_KEY, which would outrank
+    CLAUDE_CODE_OAUTH_TOKEN in Claude Code's credential order."""
+    env = dict(AGENT_ENV)
+    if auth == "subscription":
+        env["CLAUDE_CODE_OAUTH_TOKEN"] = PLACEHOLDER_OAUTH
+    else:
+        env["ANTHROPIC_API_KEY"] = PLACEHOLDER_KEY
+    return env
 
 
 def _mount(src: Path | str, dst: str, readonly: bool) -> list[str]:
@@ -64,27 +79,31 @@ def build_args(dockerfile: Path, context: Path, tag: str, build_args: dict[str, 
     return args + [str(context)]
 
 
-def gateway_run_args(name: str, network: str, image: str, gateway_py: Path, log_dir: Path, max_requests: int) -> list[str]:
+def gateway_run_args(
+    name: str, network: str, image: str, gateway_py: Path, log_dir: Path, max_requests: int, auth: str = "api_key"
+) -> list[str]:
     return [
         "docker", "run", "-d", "--rm", "--name", name, "--network", network,
         *HARDENING, "--read-only", "--pids-limit", "128", "--memory", "256m", "--user", "65534:65534",
-        # No value: docker copies ANTHROPIC_API_KEY from this process's environment,
-        # so the key never appears on a command line or in the dry-run plan.
-        "-e", "ANTHROPIC_API_KEY",
+        # No value: docker copies the credential from this process's environment,
+        # so it never appears on a command line or in the dry-run plan.
+        "-e", CREDENTIAL_ENV[auth],
         *_mount(gateway_py, "/gw/gateway.py", True),
         *_mount(log_dir, "/gw/log", False),
         image, "python", "-u", "/gw/gateway.py",
         "--listen", f"0.0.0.0:{GATEWAY_PORT}", "--stats", "/gw/log/stats.json", "--max-requests", str(max_requests),
+        "--auth", auth,
     ]
 
 
 def scan_run_args(
-    name: str, network: str, image: str, task_dir: Path, out_dir: Path, memory: str, cpus: float, pids: int
+    name: str, network: str, image: str, task_dir: Path, out_dir: Path, memory: str, cpus: float, pids: int,
+    auth: str = "api_key",
 ) -> list[str]:
     return [
         "docker", "run", "--rm", "--name", name, "--network", network,
         *HARDENING, "--pids-limit", str(pids), "--memory", memory, "--cpus", str(cpus),
-        *_env(AGENT_ENV),
+        *_env(agent_env(auth)),
         *_mount(task_dir, IN_DIR, True),
         *_mount(out_dir, OUT_DIR, False),
         image, AGENT_PY, AGENT_RUNNER, f"{IN_DIR}/task.json", OUT_DIR,

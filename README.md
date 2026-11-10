@@ -31,23 +31,51 @@ Diff mode (only components touched since a git ref) is the default; a full scan 
 | Config parsing, component splitting, diff selection, seeds, prompts, gate logic, report, dashboard | Implemented, unit-tested (`pytest`), dry run against `targets/aegis` works end to end |
 | Docker build, scan network, gateway, agent runs, verification containers | Implemented, **not yet exercised**: Docker and an API key were not available on the machine v1 was built on |
 | Aegis scan image (`targets/aegis/Dockerfile`) | Written, **not yet built** |
+| Subscription mode (`auth: subscription`) | Implemented and unit-tested, **not yet run against the real API**: whether Claude Code sends its OAuth token through `ANTHROPIC_BASE_URL` is unconfirmed |
 
-Expect the first real run to need small fixes in those last two rows. Run it on one
+Expect the first real run to need small fixes in those last three rows. Run it on one
 component first (`--max-components 1`).
 
 ## Setup
 
-Requirements: Python 3.10+, git, Docker (Docker Desktop on Windows/macOS), an Anthropic
-API key. The host needs PyYAML only; the Claude Agent SDK is installed inside the scan
-image, not on your machine.
+Requirements: Python 3.10+, git, Docker (Docker Desktop on Windows/macOS), and either a
+Claude subscription or an Anthropic API key. The host needs PyYAML only; the Claude Agent
+SDK is installed inside the scan image, not on your machine.
 
 ```bash
 python -m venv .venv
 .venv/Scripts/pip install -e ".[dev]"     # Linux/macOS: .venv/bin/pip
 ```
 
-The API key comes from the environment only. Set it in the shell you scan from and
-never write it into a file in this repo:
+### Credentials: subscription or API key
+
+`scan.auth` in `project.yaml` (or `--auth`) picks one. Either credential comes from the
+environment of the shell you scan from; never write it into a file in this repo.
+
+**`subscription`** (your own Pro/Max plan, what `targets/aegis` uses). Create a one-year
+Claude Code token and set it for the session:
+
+```bash
+claude setup-token
+```
+
+```powershell
+$env:CLAUDE_CODE_OAUTH_TOKEN = "<token>"  # PowerShell, this session only
+```
+
+- Usage is not billed per token; it counts against the plan's 5-hour and weekly limits,
+  which are shared with claude.ai and your own Claude Code use. Anthropic does not publish
+  exact numbers.
+- Safeguards in this mode: one agent at a time unless `scan.concurrency` is set; a `--full`
+  scan is refused without `--max-components`, `--only` or `--allow-full`; when the API
+  answers 429 (the usage limit), no further components start, and the report lists them
+  with a ready `--only …` command to resume after the reset.
+- Costs in the report are API-price equivalents, labelled "not billed".
+- **Personal use only.** Anthropic does not allow offering claude.ai login or subscription
+  limits to other users of a product built on the Agent SDK without approval. If Threadscan
+  is ever shipped to others, they must use an API key.
+
+**`api_key`** (Claude Console, pay per use; better for full scans):
 
 ```powershell
 $env:ANTHROPIC_API_KEY = "<key>"          # PowerShell, this session only
@@ -78,16 +106,23 @@ is gitignored).
 ### Dashboard
 
 `threadscan dashboard` (or `scan --dashboard`) serves a read-only page on
-`http://127.0.0.1:8765/`: runs in the sidebar; for the selected run the phase
-(plan, build, scan, verify, report), per-component state with live agent activity
-(turns, tool calls, last action), the verification queue, counts, tokens and cost, and the
-verified findings with severity filters, evidence, reproducer and a coloured patch. It
-refreshes every 2 s while a run is live. It uses the Thread ecosystem's Trellis look
-(as in Threadflow and Threadmap): ivory app with an always-dark sidebar, terracotta
-brand, colour for status only, Inter / Source Serif 4 / JetBrains Mono. The fonts are
-self-hosted under `threadscan/static/fonts/` (SIL OFL), so the page works offline and never
-calls a font CDN. Light and dark themes follow the system and can be toggled in the
-sidebar. Mark, accent and type choices are in [docs/branding.md](docs/branding.md).
+`http://127.0.0.1:8765/`, laid out like a cloud-security console: navy side navigation
+with the runs, a light work area, and four views.
+
+- **Overview:** KPI cards (verified issues with a severity bar, components scanned,
+  candidates, cost or subscription usage), the plan → build → scan → verify → report
+  pipeline, the usage-limit banner with the resume command, top issues, issues by
+  severity, the verification funnel.
+- **Issues:** the verified issues table with severity filter pills and search. Clicking a
+  row opens a detail drawer with Overview, Evidence (the gate's own runs), Reproducer and
+  Remediation (the patch) tabs.
+- **Components:** per-component state with live agent activity.
+- **Verification gate:** every candidate's result and the drop reasons.
+
+It refreshes every 2 s while a run is live, and follows the system light/dark setting
+(toggle at the bottom of the navigation). Inter and JetBrains Mono are self-hosted under
+`threadscan/static/fonts/` (SIL OFL), so the page works offline and never calls a font
+CDN. Mark and accent: [docs/branding.md](docs/branding.md).
 
 ## How it works
 
@@ -158,7 +193,7 @@ An unknown key in `project.yaml` is an error, so typos cannot silently change be
 | `known_issues` | none | file in the target repo listing known/accepted issues |
 | `diff_base` | `HEAD~1` | base ref for diff mode |
 | `components` | | `include`, `exclude`, `explicit[{name, paths, priority, description}]`, `auto[{root, depth}]`, `leftover` |
-| `scan` | | `concurrency` (2), `model` (`claude-opus-5-5`), `effort` (high), `max_turns` (80), `max_budget_usd` per component (5.0), `timeout_minutes` (45), `memory`, `cpus`, `pids_limit`, `max_requests` (run-wide gateway cap) |
+| `scan` | | `auth` (`api_key` or `subscription`), `concurrency` (2 with an API key, 1 with a subscription), `model` (`claude-opus-5-5`), `effort` (high), `max_turns` (80), `max_budget_usd` per component (5.0), `timeout_minutes` (45), `memory`, `cpus`, `pids_limit`, `max_requests` (run-wide gateway cap) |
 | `verification` | | `concurrency` (1), `timeout_seconds` (900), `require_patch_differential` (true), `memory`, `cpus` |
 | `seeds` | `[]` | `[{tool: codeql|sarif|gitleaks|osv, path}]`; missing files are skipped with a warning |
 | `gateway_image` | `python:3.13-slim` | image the gateway runs in |
@@ -169,19 +204,25 @@ patch on top (apt, apk or dnf base images) and keeps the image's own user.
 
 ### Cost control
 
-Diff mode by default; `concurrency: 2`; a per-component USD budget and turn limit
-enforced by the Agent SDK; a per-component wall-clock timeout; a run-wide request cap in
-the gateway. Token and cost figures in the summary come from the SDK's result messages;
-when it reports none, the report says "not reported" rather than estimating.
+Diff mode by default; `concurrency` 2 (1 on a subscription); a per-component USD budget
+and turn limit enforced by the Agent SDK (on a subscription the budget caps API-equivalent
+usage); a per-component wall-clock timeout; a run-wide request cap in the gateway; on a
+subscription, the stop at the usage limit and the full-scan guard described under
+Credentials. Token and cost figures come from the SDK's result messages; when it reports
+none, the report says "not reported" rather than estimating.
 
 ## Security model of the scanner itself
 
 What the scanner protects, and how:
 
-- **The API key never enters a target container.** The scan container gets a placeholder
-  key and `ANTHROPIC_BASE_URL` pointing at the gateway. The gateway container receives the
-  key by name (`-e ANTHROPIC_API_KEY`, value copied from your shell, never on a command line
-  or in `plan.json`), strips any credential the client sent and injects the real one.
+- **The credential never enters a target container.** The scan container gets a
+  placeholder of the right kind (`ANTHROPIC_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` with no
+  API key variable at all, since an API key would outrank the token) and
+  `ANTHROPIC_BASE_URL` pointing at the gateway. The gateway container receives the real one
+  by name (`-e ANTHROPIC_API_KEY` or `-e CLAUDE_CODE_OAUTH_TOKEN`, value copied from your
+  shell, never on a command line or in `plan.json`), strips any credential the client sent
+  and injects the real one: `x-api-key`, or `Authorization: Bearer` plus the OAuth beta flag.
+  It also records refused paths in `gateway/stats.json`.
 - **No egress except the Anthropic API.** Scan containers sit only on a Docker
   `--internal` network. The gateway is the only container on both that network and a
   per-run egress network (not Docker's default bridge), publishes no host port, accepts
@@ -227,6 +268,11 @@ Residual risks to keep in mind:
   model-generated: review them before acting.
 - A prompt injection in the target can make an agent miss things (false negatives). It
   cannot get an unproven claim past the gate.
+- Subscription mode relies on Claude Code sending its OAuth token to a custom
+  `ANTHROPIC_BASE_URL` and on the Messages API being the only endpoint it needs. If the
+  first run fails to authenticate, `gateway/stats.json` (`denied_paths`, `by_status`) shows
+  what it tried; the fallback would be giving the scan container its own route to the API,
+  which weakens the isolation above.
 - Docker Desktop containers share one VM kernel; this is container isolation, not a VM per
   scan like the hosted OSS Scanner.
 

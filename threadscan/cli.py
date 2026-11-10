@@ -7,7 +7,7 @@ import sys
 import threading
 from pathlib import Path
 
-from threadscan.config import SEED_TOOLS, ConfigError, SeedSpec, load_project
+from threadscan.config import AUTH_MODES, SEED_TOOLS, ConfigError, SeedSpec, load_project
 
 
 def _seed_arg(value: str) -> SeedSpec:
@@ -38,6 +38,7 @@ def cmd_validate(a) -> int:
     print(f"  workdir     {cfg.workdir}")
     print(f"  threat      {cfg.threat_model or '(none)'} ({len(cfg.threat_model_text)} chars)")
     print(f"  diff_base   {cfg.diff_base}")
+    print(f"  auth        {cfg.scan.auth}")
     print(f"  scan        model={cfg.scan.model} effort={cfg.scan.effort} concurrency={cfg.scan.concurrency} budget/component=${cfg.scan.max_budget_usd}")
     print(f"  verify      concurrency={cfg.verification.concurrency} timeout={cfg.verification.timeout_seconds}s differential={cfg.verification.require_patch_differential}")
     print(f"  components  {len(cfg.components.explicit)} explicit, {len(cfg.components.auto)} auto roots")
@@ -76,6 +77,8 @@ def cmd_scan(a) -> int:
         cache_dir=Path(a.cache_dir),
         extra_seeds=a.seed,
         offline=a.offline,
+        auth=a.auth,
+        allow_full=a.allow_full,
     )
     if a.dashboard:
         from threadscan.dashboard import serve
@@ -120,6 +123,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_selection_args(p)
     p.add_argument("--concurrency", type=int, metavar="N", help="agents in parallel (default: project.yaml, which defaults to 2)")
     p.add_argument("--dry-run", action="store_true", help="plan only: no build, no agents, no API calls")
+    p.add_argument("--auth", choices=AUTH_MODES, help="api_key (ANTHROPIC_API_KEY) or subscription (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`); default: project.yaml")
+    p.add_argument("--allow-full", action="store_true", help="allow an unbounded --full scan on a subscription")
     p.add_argument("--seed", action="append", default=[], type=_seed_arg, metavar="TOOL=PATH", help=f"extra seed file ({', '.join(SEED_TOOLS)})")
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--cache-dir", default=".cache")

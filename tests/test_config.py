@@ -141,6 +141,6 @@ def test_not_yaml(target_dir):
 def test_shipped_aegis_target_parses():
     cfg = load_project(Path(__file__).resolve().parents[1] / "targets" / "aegis")
     assert cfg.name == "aegis"
-    assert cfg.scan.concurrency == 2
+    assert cfg.scan.auth == "subscription" and cfg.scan.concurrency == 1
     assert cfg.known_issues == "docs/security/open-findings.md"
     assert "Severity" in cfg.threat_model_text

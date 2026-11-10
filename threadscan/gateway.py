@@ -8,8 +8,13 @@ It listens on the internal scan network, accepts plain HTTP from the agent, and:
 * forwards to one fixed upstream, ``https://api.anthropic.com``, with certificate
   verification; absolute-form proxy requests (``GET http://other.host/``) are refused,
   so it cannot be used as a general proxy;
-* drops any credential the client sent and injects the real key from its own
-  environment, so the key never enters the scan container;
+* drops any credential the client sent and injects the real one from its own
+  environment, so it never enters the scan container: an API key (``x-api-key``) or,
+  in subscription mode, the ``claude setup-token`` OAuth token (``Authorization: Bearer``
+  plus the OAuth beta flag);
+* records 429 responses (``limit_hit_at`` in the stats file): with a subscription that is
+  the plan's usage limit, and the host stops starting new components;
+* records refused paths, so a first run shows anything else Claude Code tried to reach;
 * stops forwarding after ``--max-requests`` (a run-wide backstop on spend);
 * streams responses (server-sent events) through unbuffered.
 """
@@ -32,6 +37,8 @@ ALLOWED = {
     ("POST", "/v1/messages/count_tokens"),
 }
 ALLOWED_GET_PREFIX = "/v1/models"
+OAUTH_BETA = "oauth-2025-04-20"
+CREDENTIAL_ENV = {"api_key": "ANTHROPIC_API_KEY", "subscription": "CLAUDE_CODE_OAUTH_TOKEN"}
 MAX_BODY = 32 * 1024 * 1024
 HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer",
@@ -54,21 +61,37 @@ def is_allowed(method: str, target: str) -> bool:
     return False
 
 
-def upstream_headers(incoming: list[tuple[str, str]], api_key: str) -> dict[str, str]:
-    out = {}
+def upstream_headers(incoming: list[tuple[str, str]], credential: str, auth: str = "api_key") -> dict[str, str]:
+    out: dict[str, str] = {}
+    beta: list[str] = []
     for k, v in incoming:
-        if k.lower() not in DROP_REQUEST:
-            out[k] = v
-    out["x-api-key"] = api_key
+        lk = k.lower()
+        if lk in DROP_REQUEST:
+            continue
+        if lk == "anthropic-beta":
+            beta += [b.strip() for b in v.split(",") if b.strip()]
+            continue
+        out[k] = v
+    if auth == "subscription":
+        out["authorization"] = f"Bearer {credential}"
+        if OAUTH_BETA not in beta:
+            beta.append(OAUTH_BETA)
+    else:
+        out["x-api-key"] = credential
+    if beta:
+        out["anthropic-beta"] = ",".join(dict.fromkeys(beta))
     return out
 
 
 class Stats:
-    def __init__(self, path: str | None, max_requests: int):
+    def __init__(self, path: str | None, max_requests: int, auth: str = "api_key"):
         self.path = path
         self.max_requests = max_requests
         self.lock = threading.Lock()
-        self.data = {"forwarded": 0, "denied": 0, "over_limit": 0, "by_status": {}, "started": time.time()}
+        self.data = {
+            "auth": auth, "forwarded": 0, "denied": 0, "over_limit": 0, "by_status": {},
+            "denied_paths": {}, "rate_limited": 0, "limit_hit_at": None, "started": time.time(),
+        }
 
     def take_slot(self) -> bool:
         with self.lock:
@@ -79,10 +102,16 @@ class Stats:
             self.data["forwarded"] += 1
             return True
 
-    def record(self, key: str, status: int | None = None) -> None:
+    def record(self, key: str, status: int | None = None, path: str | None = None) -> None:
         with self.lock:
             if key == "denied":
                 self.data["denied"] += 1
+                if path and (path in self.data["denied_paths"] or len(self.data["denied_paths"]) < 50):
+                    self.data["denied_paths"][path] = self.data["denied_paths"].get(path, 0) + 1
+            if status == 429 and key == "forwarded":
+                self.data["rate_limited"] += 1
+                if self.data["limit_hit_at"] is None:
+                    self.data["limit_hit_at"] = time.time()
             if status is not None:
                 s = str(status)
                 self.data["by_status"][s] = self.data["by_status"].get(s, 0) + 1
@@ -97,7 +126,9 @@ class Stats:
         os.replace(tmp, self.path)
 
 
-def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST, ssl_ctx: ssl.SSLContext | None = None):
+def make_handler(
+    credential: str, stats: Stats, upstream_host: str = UPSTREAM_HOST, ssl_ctx: ssl.SSLContext | None = None, auth: str = "api_key"
+):
     ctx = ssl_ctx or ssl.create_default_context()
 
     class Handler(BaseHTTPRequestHandler):
@@ -109,7 +140,7 @@ def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST,
             sys.stdout.write("%s %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
         def _deny(self, code: int, msg: str) -> None:
-            stats.record("denied", code)
+            stats.record("denied", code, f"{self.command} {self.path.split('?')[0][:120]}")
             body = json.dumps({"type": "error", "error": {"type": "threadscan_gateway", "message": msg}}).encode()
             self.send_response(code)
             self.send_header("content-type", "application/json")
@@ -134,7 +165,7 @@ def make_handler(api_key: str, stats: Stats, upstream_host: str = UPSTREAM_HOST,
                 return self._deny(429, "run-wide request limit reached (scan.max_requests)")
             conn = http.client.HTTPSConnection(upstream_host, 443, context=ctx, timeout=900)
             try:
-                conn.request(method, self.path, body=body, headers=upstream_headers(list(self.headers.items()), api_key))
+                conn.request(method, self.path, body=body, headers=upstream_headers(list(self.headers.items()), credential, auth))
                 resp = conn.getresponse()
                 self.send_response(resp.status)
                 clen = resp.getheader("content-length")
@@ -184,17 +215,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--listen", default="0.0.0.0:8080")
     ap.add_argument("--stats", default=None)
     ap.add_argument("--max-requests", type=int, default=2000)
+    ap.add_argument("--auth", choices=sorted(CREDENTIAL_ENV), default="api_key")
     args = ap.parse_args(argv)
-    key = os.environ.pop("ANTHROPIC_API_KEY", "")
-    if not key:
-        print("ANTHROPIC_API_KEY is not set in the gateway's environment", file=sys.stderr)
+    env_name = CREDENTIAL_ENV[args.auth]
+    credential = os.environ.pop(env_name, "")
+    if not credential:
+        print(f"{env_name} is not set in the gateway's environment", file=sys.stderr)
         return 2
     host, _, port = args.listen.rpartition(":")
-    stats = Stats(args.stats, args.max_requests)
+    stats = Stats(args.stats, args.max_requests, args.auth)
     stats.record("start")
-    server = ThreadingHTTPServer((host or "0.0.0.0", int(port)), make_handler(key, stats))
+    server = ThreadingHTTPServer((host or "0.0.0.0", int(port)), make_handler(credential, stats, auth=args.auth))
     server.daemon_threads = True
-    print(f"threadscan gateway listening on {args.listen}, upstream https://{UPSTREAM_HOST}", flush=True)
+    print(f"threadscan gateway listening on {args.listen}, upstream https://{UPSTREAM_HOST}, auth {args.auth}", flush=True)
     server.serve_forever()
     return 0
 

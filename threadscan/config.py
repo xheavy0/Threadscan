@@ -17,6 +17,9 @@ NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,39}$")
 MEMORY_RE = re.compile(r"^[1-9][0-9]*[mg]$")
 SEED_TOOLS = ("codeql", "sarif", "gitleaks", "osv")
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
+# api_key: ANTHROPIC_API_KEY (Console, pay per use).
+# subscription: CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token` (your own Pro/Max plan; personal use only).
+AUTH_MODES = ("api_key", "subscription")
 # git transports that can run commands (ext::) or read the host (file://) are refused.
 _URL_RE = re.compile(r"^(https://|ssh://|git@[A-Za-z0-9.-]+:)[^\s]+$")
 
@@ -76,7 +79,10 @@ class ComponentsConfig:
 
 @dataclass
 class ScanConfig:
+    auth: str = "api_key"
+    # Default 2 with an API key, 1 with a subscription (one agent drains the plan's limits slower).
     concurrency: int = 2
+    concurrency_explicit: bool = False
     model: str = "claude-opus-5-5"
     effort: str = "high"
     max_turns: int = 80
@@ -258,10 +264,16 @@ def _parse_scan(r: _Reader, data: Any) -> ScanConfig:
     d = r.mapping(
         data,
         ctx,
-        {"concurrency", "model", "effort", "max_turns", "max_budget_usd", "timeout_minutes", "memory", "cpus", "pids_limit", "max_requests"},
+        {"auth", "concurrency", "model", "effort", "max_turns", "max_budget_usd", "timeout_minutes", "memory", "cpus", "pids_limit", "max_requests"},
     )
     s = ScanConfig()
+    s.auth = r.get(d, "auth", str, s.auth, ctx)
+    if s.auth not in AUTH_MODES:
+        r.problems.append(f"{ctx}.auth: must be one of {', '.join(AUTH_MODES)}")
+    s.concurrency_explicit = d.get("concurrency") is not None
     s.concurrency = r.int_range(d, "concurrency", s.concurrency, 1, 16, ctx)
+    if s.auth == "subscription" and not s.concurrency_explicit:
+        s.concurrency = 1
     s.model = r.get(d, "model", str, s.model, ctx)
     s.effort = r.get(d, "effort", str, s.effort, ctx)
     if s.effort not in EFFORTS:

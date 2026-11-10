@@ -116,3 +116,12 @@ def test_dashboard_run_dir_validation(runs):
     assert dashboard.run_dir_for(runs, "20260101-000000-demo") is not None
     for bad in ["..", "../x", "a/b", "", ".hidden", "x" * 200]:
         assert dashboard.run_dir_for(runs, bad) is None
+
+
+def test_run_status_passes_usage_limit_fields(runs):
+    run = runs / "20260101-000000-demo"
+    write_json(run / "summary.json", {"verified": 0, "components_skipped": ["a", "b"], "limit_reached": True,
+                                      "resume_command": 'threadscan scan "t" --full --only "a" --only "b"'})
+    st = dashboard.run_status(run)
+    assert st["summary"]["components_skipped"] == ["a", "b"]
+    assert st["summary"]["limit_reached"] is True and "--only" in st["summary"]["resume_command"]

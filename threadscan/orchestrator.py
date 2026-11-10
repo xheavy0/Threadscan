@@ -38,6 +38,8 @@ class ScanOptions:
     cache_dir: Path = Path(".cache")
     extra_seeds: list[SeedSpec] = field(default_factory=list)
     offline: bool = False
+    auth: str | None = None  # overrides project.yaml scan.auth
+    allow_full: bool = False  # a full scan on a subscription needs this
 
 
 class Backend(Protocol):
@@ -46,6 +48,8 @@ class Backend(Protocol):
     def executor(self, run_dir: Path) -> Executor: ...
     def gateway_stats(self) -> dict | None: ...
     def close(self) -> None: ...
+    # Optional: True once the API answered 429 (with a subscription: the plan's usage limit).
+    # def limit_reached(self) -> bool: ...
 
 
 # --------------------------------------------------------------------------- docker
@@ -123,7 +127,7 @@ class DockerBackend:
         gw_log = run_dir / "gateway"
         dk.make_writable(gw_log)
         self.docker.check(
-            dk.gateway_run_args(self.gateway, self.egress_net, self.cfg.gateway_image, PKG_DIR / "gateway.py", gw_log, self.cfg.scan.max_requests),
+            dk.gateway_run_args(self.gateway, self.egress_net, self.cfg.gateway_image, PKG_DIR / "gateway.py", gw_log, self.cfg.scan.max_requests, self.cfg.scan.auth),
             "gateway start",
         )
         self.containers.append(self.gateway)
@@ -133,7 +137,7 @@ class DockerBackend:
         dk.make_writable(out_dir)
         s = self.cfg.scan
         name = f"threadscan-{self.run_id}-{comp.slug}"[:120]
-        args = dk.scan_run_args(name, self.internal_net, self.scan_image, task_dir, out_dir, s.memory, s.cpus, s.pids_limit)
+        args = dk.scan_run_args(name, self.internal_net, self.scan_image, task_dir, out_dir, s.memory, s.cpus, s.pids_limit, s.auth)
         p = self.docker.call(args, timeout=s.timeout_minutes * 60, kill_name=name, log=out_dir.parent / "container.log")
         if p.timed_out:
             raise TimeoutError(f"component scan exceeded {s.timeout_minutes} minutes")
@@ -147,7 +151,14 @@ class DockerBackend:
         if self.run_dir is None:
             return None
         p = self.run_dir / "gateway" / "stats.json"
-        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
+        try:
+            return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else None
+        except ValueError:  # caught mid-write; the next read sees it
+            return None
+
+    def limit_reached(self) -> bool:
+        stats = self.gateway_stats()
+        return bool(stats and stats.get("limit_hit_at"))
 
     def close(self) -> None:
         if self.run_dir is not None and self.gateway in self.containers:
@@ -167,9 +178,9 @@ def _plan_commands(cfg: ProjectConfig, repo: Path, run_dir: Path, run_id: str, c
         "build_target": dk.build_args(cfg.dockerfile, repo, target),
         "build_overlay": dk.build_args(DOCKER_DIR / "overlay.Dockerfile", run_dir / "overlay-context", scan, {"BASE_IMAGE": target, "TARGET_USER": "<from image config>", "AGENT_SDK_SPEC": "claude-agent-sdk"}),
         "networks": [["docker", "network", "create", "--driver", "bridge", "--internal", net], ["docker", "network", "create", "--driver", "bridge", f"threadscan-{run_id}-egress"]],
-        "gateway": dk.gateway_run_args(f"threadscan-{run_id}-gw", f"threadscan-{run_id}-egress", cfg.gateway_image, PKG_DIR / "gateway.py", run_dir / "gateway", s.max_requests),
+        "gateway": dk.gateway_run_args(f"threadscan-{run_id}-gw", f"threadscan-{run_id}-egress", cfg.gateway_image, PKG_DIR / "gateway.py", run_dir / "gateway", s.max_requests, s.auth),
         "scan": [
-            dk.scan_run_args(f"threadscan-{run_id}-{c.slug}", net, scan, run_dir / "components" / c.slug, run_dir / "components" / c.slug / "out", s.memory, s.cpus, s.pids_limit)
+            dk.scan_run_args(f"threadscan-{run_id}-{c.slug}", net, scan, run_dir / "components" / c.slug, run_dir / "components" / c.slug / "out", s.memory, s.cpus, s.pids_limit, s.auth)
             for c in comps
         ],
         "verify_template": dk.verify_run_args(f"threadscan-{run_id}-<id>-<mode>", scan, run_dir / "verify" / "<id>" / "in", "<unpatched|patched>", "<random nonce>", cfg.workdir, v.memory, v.cpus),
@@ -191,15 +202,43 @@ def _component_result(comp: Component, state: str, raw: dict | None, error: str 
     }
 
 
+CREDENTIAL_HELP = {
+    "api_key": "ANTHROPIC_API_KEY is not set; export it in this shell (never put it in a file in the repo)",
+    "subscription": "CLAUDE_CODE_OAUTH_TOKEN is not set; run `claude setup-token` and set the token in this shell "
+    "(never put it in a file in the repo)",
+}
+
+
+def resume_command(cfg: ProjectConfig, mode: str, base: str | None, names: list[str]) -> str:
+    sel = "--full" if mode == "full" else f"--since {base}"
+    only = " ".join(f'--only "{n}"' for n in names)
+    return f'threadscan scan "{cfg.target_dir}" {sel} {only}'.strip()
+
+
+def check_full_scan_guard(cfg: ProjectConfig, opts: ScanOptions) -> None:
+    """On a subscription, an unbounded full scan would drain the plan's limits: require intent."""
+    if cfg.scan.auth == "subscription" and opts.mode == "full" and not opts.dry_run:
+        if not (opts.max_components or opts.only or opts.allow_full):
+            raise RuntimeError(
+                "a full scan on a subscription can use up its 5-hour and weekly limits; "
+                "pass --max-components N or --only NAME, or --allow-full if you mean it"
+            )
+
+
 def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = None, log=print) -> Path:
+    if opts.auth:
+        cfg.scan.auth = opts.auth
+        if opts.auth == "subscription" and not cfg.scan.concurrency_explicit:
+            cfg.scan.concurrency = 1
+    if opts.concurrency:
+        cfg.scan.concurrency = opts.concurrency
+    check_full_scan_guard(cfg, opts)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     run_id = f"{stamp}-{cfg.name}"
     run_dir = (opts.runs_dir / run_id).resolve()
     run_dir.mkdir(parents=True, exist_ok=False)
     base = opts.base or cfg.diff_base
-    status = StatusTracker(run_dir, run_id, cfg.name, opts.mode, base if opts.mode == "diff" else None, opts.dry_run)
-    if opts.concurrency:
-        cfg.scan.concurrency = opts.concurrency
+    status = StatusTracker(run_dir, run_id, cfg.name, opts.mode, base if opts.mode == "diff" else None, opts.dry_run, cfg.scan.auth)
 
     try:
         # ---------------------------------------------------------------- plan
@@ -226,7 +265,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
         status.set_components([c.to_dict() for c in comps])
         meta = {
             "run_id": run_id, "project": cfg.name, "mode": opts.mode, "base": base if opts.mode == "diff" else None,
-            "commit": head_commit(repo), "model": cfg.scan.model, "dry_run": opts.dry_run,
+            "commit": head_commit(repo), "model": cfg.scan.model, "dry_run": opts.dry_run, "auth": cfg.scan.auth,
             "concurrency": cfg.scan.concurrency, "repo": str(repo) if not cfg.repo_is_url else cfg.repo,
         }
         write_json(run_dir / "plan.json", {"meta": meta, "components": [c.to_dict() for c in comps], "seeds": len(seeds), "commands": _plan_commands(cfg, repo, run_dir, run_id, comps)})
@@ -247,11 +286,11 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
 
         # ---------------------------------------------------------------- build
         if backend is None:
+            if not os.environ.get(dk.CREDENTIAL_ENV[cfg.scan.auth]):
+                raise RuntimeError(CREDENTIAL_HELP[cfg.scan.auth])
             ok, why = dk.Docker.available()
             if not ok:
                 raise RuntimeError(f"Docker is required for a real scan ({why}); use --dry-run to plan only")
-            if not os.environ.get("ANTHROPIC_API_KEY"):
-                raise RuntimeError("ANTHROPIC_API_KEY is not set; export it in this shell (never put it in a file in the repo)")
             backend = DockerBackend(cfg, repo, run_id)
         status.phase("building", "building the target image and the scan overlay")
         try:
@@ -262,8 +301,19 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
             raw_by_comp: dict[str, dict | None] = {}
             results: list[dict] = []
 
+            def limit_hit() -> bool:
+                if cfg.scan.auth != "subscription":
+                    return False
+                probe = getattr(backend, "limit_reached", None)
+                return bool(probe and probe())
+
             def scan_one(c: Component) -> dict:
                 cdir = run_dir / "components" / c.slug
+                if limit_hit():
+                    err = "not started: the subscription's usage limit was reached"
+                    status.component(c.name, state="skipped", error=err)
+                    log(f"[skipped] {c.name}: usage limit reached")
+                    return _component_result(c, "skipped", None, err)
                 status.component(c.name, state="running", started=time.time())
                 raw, err, state = None, None, "done"
                 try:
@@ -278,6 +328,8 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                         err, state = "agent finished without structured output", "error"
                 except Exception as exc:
                     err, state = f"{type(exc).__name__}: {exc}", "error"
+                if state == "error" and limit_hit():
+                    err = f"usage limit reached during this component ({err})"
                 raw_by_comp[c.name] = raw
                 n = len(((raw or {}).get("structured") or {}).get("findings") or [])
                 r = _component_result(c, state, raw, err)
@@ -334,6 +386,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
                     findings.append(finding_dict(cand, v))
                 else:
                     dropped.append(Dropped(cand.component, v.reason, cand.title, cand.id, v.notes))
+            skipped = [r["name"] for r in results if r["state"] == "skipped"]
             for r in results:
                 if r["state"] == "error":
                     dropped.append(Dropped(r["name"], "agent_error", "", None, [r["error"] or ""]))
@@ -350,9 +403,17 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
         cand_dropped = [d for d in dropped if d.reason != "agent_error"]
         summary = build_summary(len(comps), results, total_candidates, findings, cand_dropped, len(seeds), seeds_assigned, triage, gw)
         summary["agent_errors"] = by_reason.get("agent_error", 0)
+        summary["components_skipped"] = skipped
+        summary["limit_reached"] = bool(skipped) or bool(gw and gw.get("limit_hit_at"))
+        if skipped:
+            summary["resume_command"] = resume_command(cfg, opts.mode, base, skipped)
         write_outputs(run_dir, meta, findings, dropped, summary)
         status.counts(verified=len(findings), dropped=len(cand_dropped), by_reason={k: v for k, v in by_reason.items() if k != "agent_error"})
-        status.phase("done", f"{len(findings)} verified, {len(cand_dropped)} dropped")
+        done_msg = f"{len(findings)} verified, {len(cand_dropped)} dropped"
+        if skipped:
+            done_msg += f"; usage limit reached, {len(skipped)} components not scanned (resume command in the report)"
+            log("usage limit reached; resume later with:\n  " + summary["resume_command"])
+        status.phase("done", done_msg)
         return run_dir
     except Exception as exc:
         status.phase("failed", f"{type(exc).__name__}: {exc}")
