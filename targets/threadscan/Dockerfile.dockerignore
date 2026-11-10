@@ -1,0 +1,11 @@
+.git
+.venv
+runs
+.cache
+**/__pycache__
+.env
+.env.*
+*.key
+*.pem
+.claude
+CLAUDE.md

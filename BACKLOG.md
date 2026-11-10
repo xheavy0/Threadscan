@@ -55,3 +55,4 @@ Fira Code, the fonts Wiz's product UI loads.
 - [ ] `threadscan doctor targets\demo --live` all OK
 - [ ] Demo scan verifies at least one planted bug
 - [ ] One component of a real target scanned end to end
+- [ ] Threadscan scans itself (`targets/threadscan`), findings triaged

@@ -1,0 +1,71 @@
+# Threadscan scanning itself. Clones the public repository rather than using this checkout,
+# so the image never holds local runs/ (scan reports) or private targets.
+#
+#   threadscan scan targets/threadscan --full --max-components 1 --dashboard   # one component
+#   threadscan scan targets/threadscan --full                                   # all five
+
+name: threadscan
+repo: https://github.com/xheavy0/Threadscan.git#main
+dockerfile: Dockerfile
+workdir: /src
+threat_model: threat_model.md
+
+components:
+  exclude:
+    - "tests/**"
+    - "examples/**"      # the demo app is vulnerable on purpose
+    - "targets/**"
+    - "**/*.md"
+    - "threadscan/static/**"
+  explicit:
+    - name: gateway
+      priority: 10
+      description: API gateway holding the credential, container launch and network isolation
+      paths: ["threadscan/gateway.py", "threadscan/docker_ops.py", "docker/**"]
+    - name: agent-and-gate
+      priority: 9
+      description: agent runner, prompts, candidate parsing, verification gate, redaction, reports
+      paths:
+        - "threadscan/agent_runner.py"
+        - "threadscan/prompts.py"
+        - "threadscan/candidates.py"
+        - "threadscan/verify.py"
+        - "threadscan/redact.py"
+        - "threadscan/orchestrator.py"
+        - "threadscan/report.py"
+        - "threadscan/status.py"
+    - name: dashboard
+      priority: 9
+      description: localhost dashboard, triage writes, exports (SARIF, CSV, HTML)
+      paths:
+        - "threadscan/dashboard.py"
+        - "threadscan/dashboard.html"
+        - "threadscan/triage.py"
+        - "threadscan/exporters.py"
+        - "threadscan/history.py"
+        - "threadscan/owasp.py"
+    - name: ask
+      priority: 8
+      description: Ask AI per issue, model providers and their credentials
+      paths: ["threadscan/ask.py"]
+    - name: cli-and-repo
+      priority: 6
+      description: CLI, config parsing, git access, seeds, init, recheck, watch, prune, doctor
+      paths: ["threadscan/*.py", "pyproject.toml"]
+  leftover: null
+
+scan:
+  auth: subscription
+  concurrency: 1
+  effort: medium
+  max_turns: 60
+  max_budget_usd: 3.0
+  timeout_minutes: 30
+  memory: 2g
+  cpus: 1
+  max_requests: 400
+
+verification:
+  timeout_seconds: 180
+  memory: 1g
+  cpus: 1

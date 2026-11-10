@@ -84,7 +84,21 @@ The first build of a large target's scan image downloads all its dependencies: a
 minutes and 10–20 GiB of disk. Later runs reuse it. Diff mode scans what changed since
 `HEAD~1`; pass `--since <ref>` for more, or `--only auth` for a chosen component.
 
-## 7. What to bring back
+## 7. Threadscan scanning itself
+
+`targets\threadscan` clones the public repository (never this checkout), so the image holds
+no local runs or private targets. Start with one component, then the rest:
+
+```powershell
+.venv\Scripts\threadscan scan targets\threadscan --full --only gateway --dashboard
+.venv\Scripts\threadscan scan targets\threadscan --full
+```
+
+Five components, one at a time (`concurrency: 1`), each capped at `max_budget_usd: 3.0`.
+A verified finding here is a bug in Threadscan: fix it in this repo, push, then
+`threadscan recheck targets\threadscan`.
+
+## 8. What to bring back
 
 - The `doctor --live` output (it never prints the token).
 - `runs\<run>\gateway\stats.json` (`denied_paths`, `by_status`).
