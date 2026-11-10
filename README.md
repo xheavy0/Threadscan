@@ -102,6 +102,7 @@ threadscan scan targets/aegis --since origin/main         # diff mode against an
 threadscan scan targets/aegis --full --concurrency 2      # full scan (expensive)
 threadscan scan targets/aegis --seed codeql=codeql.sarif --seed osv=osv.json
 threadscan dashboard                                      # http://127.0.0.1:8765/
+threadscan export runs/<run-id> --format all              # SARIF, CSV, JSON, self-contained HTML
 ```
 
 Useful flags: `--only NAME` (repeatable) scans named components; `--repo PATH|URL`
@@ -118,6 +119,29 @@ checks that the internal network cannot reach the internet, builds a small scan 
 the real overlay, runs one tiny Claude Code agent through the gateway (Haiku by default,
 `--model` to change), and runs the verification driver offline. Results are printed and
 saved to `runs/doctor-<time>/doctor.json`.
+
+### Reports and exports
+
+Every finished run writes `findings.sarif` and `report.html` next to `report.md`.
+`threadscan export <run> --format sarif|csv|json|html|all [--out DIR]` regenerates them with
+the current triage, and the dashboard's **Reports** view downloads any of them per run.
+
+- **HTML:** one self-contained file (styles, fonts and mark embedded, no script, every value
+  escaped) for people outside the dashboard. It opens offline and prints to PDF.
+- **SARIF 2.1.0:** one rule and result per verified issue, with CWE and OWASP tags,
+  `security-severity`, a stable fingerprint, and triage in the properties. Risk-accepted and
+  false-positive issues carry an external suppression, so code-scanning tools show them as
+  dismissed. To send it to GitHub code scanning yourself (needs code scanning on the repo;
+  this writes to GitHub, Threadscan never does it for you):
+
+  ```bash
+  gzip -c findings.sarif | base64 -w0 > sarif.b64
+  gh api repos/OWNER/REPO/code-scanning/sarifs -f commit_sha=<full sha> -f ref=refs/heads/main -F sarif=@sarif.b64
+  ```
+- **CSV / JSON:** the issues with status, assignee, lifecycle and verification. CSV cells that
+  could run as spreadsheet formulas are prefixed with `'`.
+
+Only verified issues are ever exported; dropped candidates are not.
 
 ### Demo target
 
@@ -350,6 +374,7 @@ Residual risks to keep in mind:
 | `components/<slug>/out/` | `progress.json`, `transcript.jsonl`, `candidates.json` from the agent |
 | `verify/<id>/` | gate inputs, container logs, `verdict.json` |
 | `findings/<id>.json`, `findings.json` | verified findings only (with OWASP category; carried-over ones marked) |
+| `report.html`, `findings.sarif` | the self-contained report and the SARIF export (regenerate with `threadscan export`) |
 | `seeds.json` | seed findings with their component and the agent's verdict |
 | `lifecycle.json` | new, existing, resolved (re-checked), re-verified, unverified and not-rescanned issues vs the previous run |
 | `dropped.json` | unproven candidates with reasons (scanner debugging, not findings) |

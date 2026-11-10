@@ -407,7 +407,7 @@ const REASONS = {
 };
 const VIEWS = [["overview", "Boards", "overview"], ["issues", "Issues", "issues"], ["findings", "Findings", "findings"], ["graph", "Graph", "graph"],
   ["components", "Inventory", "components"], ["gate", "Gate", "gate"], ["trends", "Trends", "trends"], ["compliance", "Compliance", "compliance"],
-  ["policies", "Policies", "policies"]];
+  ["reports", "Reports", "file"], ["policies", "Policies", "policies"]];
 const VERDICT = { true_positive: ["bad", "Agent: true positive"], false_positive: ["", "Agent: false positive"], unsure: ["warn", "Agent: unsure"], not_reviewed: ["", "Not reviewed"] };
 
 const S = {
@@ -802,7 +802,9 @@ function issuesView() {
     anyFilter ? h("button", { class: "link-btn", type: "button", onclick: () => { Object.values(S.filters).forEach(z => z.clear()); S.q = ""; document.getElementById("q").value = ""; render(); } }, "Reset") : null,
     h("span", { class: "results-count" }, list.length + " issues",
       h("button", { class: "fpill", type: "button", onclick: e => { e.stopPropagation(); viewsMenu(e.currentTarget); } }, icon("bookmark", "sm"), "Views", savedViews().length ? h("span", { class: "muted" }, savedViews().length) : null),
-      h("button", { class: "icon-btn boxed", type: "button", title: "Export", onclick: e => { e.stopPropagation(); openMenu(e.currentTarget, [{ head: "Export " + list.length + " issues" }, { value: "csv", label: "CSV" }, { value: "json", label: "JSON" }], k => exportIssues(list, k), false); } }, icon("download"))));
+      h("button", { class: "icon-btn boxed", type: "button", title: "Export", onclick: e => { e.stopPropagation(); openMenu(e.currentTarget, [{ head: "Filtered list (" + list.length + ")" }, { value: "csv", label: "CSV" }, { value: "json", label: "JSON" },
+        { head: "Whole run" }, { value: "run:html", label: "HTML report" }, { value: "run:sarif", label: "SARIF" }],
+        k => k.startsWith("run:") ? (location.href = exportUrl(S.st.run_id, k.slice(4))) : exportIssues(list, k), false); } }, icon("download"))));
   const group = h("div", { class: "groupby" }, h("span", { class: "lbl" }, "GROUP BY"),
     [["none", "None"], ["component", "Component"], ["owasp", "OWASP"], ["severity", "Severity"], ["status", "Status"]].map(([k, l]) =>
       h("button", { type: "button", "aria-pressed": String(S.group === k), onclick: () => { S.group = k; S.openGroups = new Set(); renderMainOnly(); } }, l)));
@@ -1001,6 +1003,40 @@ function findingsView() {
     chips, h("div", { class: "card table-card" }, body)];
 }
 
+/* ---------- Reports ---------- */
+const EXPORTS = [["html", "HTML report"], ["sarif", "SARIF"], ["csv", "CSV"], ["json", "JSON"]];
+function exportUrl(runId, fmt) { return "/api/runs/" + encodeURIComponent(runId) + "/export/" + fmt; }
+function reportsView() {
+  const done = S.runs.filter(r => r.phase === "done" && !r.dry_run);
+  const cur = S.st;
+  const sarifCmd = "gzip -c findings.sarif | base64 -w0 > sarif.b64\n" +
+    "gh api repos/OWNER/REPO/code-scanning/sarifs -f commit_sha=" + ((S.plan && S.plan.meta && S.plan.meta.commit) || "<full commit sha>") +
+    " -f ref=refs/heads/main -F sarif=@sarif.b64";
+  const exportButtons = runId => h("span", { style: "display:inline-flex;gap:6px;flex-wrap:wrap" },
+    EXPORTS.map(([fmt, label]) => h("a", { class: "btn-ghost", href: exportUrl(runId, fmt), style: "text-decoration:none;display:inline-flex;align-items:center;gap:6px" }, icon("download", "sm"), label)),
+    h("a", { class: "btn-ghost", href: "/api/runs/" + encodeURIComponent(runId) + "/report", target: "_blank", rel: "noopener", style: "text-decoration:none;display:inline-flex;align-items:center;gap:6px" }, icon("file", "sm"), "report.md"));
+  return [pageHead("Reports"),
+    h("div", { class: "widgets two" },
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "This run"), h("div", { class: "sub" }, cur.run_id))),
+        h("div", { class: "card-b" },
+          h("p", { class: "muted", style: "margin-bottom:12px" }, "Exports contain verified issues only, with the current triage status, assignee and note. The HTML report is self-contained: it opens offline and prints to PDF."),
+          cur.dry_run || !["done"].includes(cur.phase) ? h("p", { class: "muted" }, "Available once a scan has finished.") : exportButtons(cur.run_id))),
+      h("div", { class: "card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "Send to GitHub code scanning"), h("div", { class: "sub" }, "optional; run it yourself"))),
+        h("div", { class: "card-b" },
+          h("p", { class: "muted", style: "margin-bottom:10px" }, "The SARIF file follows the 2.1.0 standard. Risk-accepted and false-positive issues carry a suppression, so they arrive dismissed. Code scanning must be enabled on the repository; uploading writes to GitHub."),
+          h("div", { class: "copy-row" }, h("button", { class: "btn-ghost", type: "button", onclick: e => copyText(sarifCmd, e.currentTarget) }, icon("copy", "sm"), "Copy")),
+          h("pre", null, sarifCmd)))),
+    h("div", { class: "card table-card" }, h("div", { class: "card-h" }, h("div", null, h("h3", null, "All finished runs"), h("div", { class: "sub" }, done.length + " on this machine"))),
+      done.length ? h("div", { class: "table-wrap", style: "margin-top:8px" }, h("table", null,
+        h("thead", null, h("tr", null, ["Run", "Target", "Mode", "Verified", "Download"].map(x => h("th", null, x)))),
+        h("tbody", null, done.map(r => h("tr", null,
+          h("td", null, h("div", { class: "t-title link", onclick: () => select(r.run_id) }, when(r.started)), h("div", { class: "t-sub" }, r.run_id)),
+          h("td", null, r.project), h("td", null, r.mode === "full" ? "Full" : "Diff"),
+          h("td", { class: "num" }, (r.counts || {}).verified || 0),
+          h("td", null, exportButtons(r.run_id)))))))
+        : h("div", { class: "empty" }, "No finished scans yet."))];
+}
+
 /* ---------- Policies (what this run was told) ---------- */
 function kvTable(rows) { return h("table", { class: "kvt" }, h("tbody", null, rows.map(([k, v]) => h("tr", null, h("td", null, k), h("td", null, v))))); }
 function policiesView() {
@@ -1114,7 +1150,7 @@ function renderMainOnly() {
   const active = document.activeElement && document.activeElement.closest && document.activeElement.closest(".filters .search-pill") ? document.activeElement : null;
   const pos = active ? active.selectionStart : null;
   const v = S.view;
-  const nodes = v === "issues" ? issuesView() : v === "findings" ? findingsView() : v === "policies" ? policiesView() : v === "graph" ? graphView() : v === "components" ? componentsView() : v === "gate" ? gateView()
+  const nodes = v === "issues" ? issuesView() : v === "findings" ? findingsView() : v === "policies" ? policiesView() : v === "reports" ? reportsView() : v === "graph" ? graphView() : v === "components" ? componentsView() : v === "gate" ? gateView()
     : v === "trends" ? trendsView() : v === "compliance" ? complianceView() : overview();
   main.replaceChildren(...nodes.flat(Infinity).filter(Boolean));
   if (active) { const inp = main.querySelector(".filters .search-pill input"); if (inp) { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch (e) {} } }

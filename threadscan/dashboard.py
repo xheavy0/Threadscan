@@ -18,6 +18,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from threadscan import history
+from threadscan.exporters import FORMATS, export
 from threadscan.owasp import categories, categorize
 from threadscan.redact import redact_obj
 from threadscan.triage import STATUSES, TriageError, TriageStore
@@ -138,6 +139,19 @@ def make_handler(runs_dir: Path, port: int):
             self.end_headers()
             self.wfile.write(body)
 
+        def _download(self, filename: str, ctype: str, body: bytes) -> None:
+            """Always an attachment: the HTML report is saved, never rendered on this origin."""
+            safe = re.sub(r"[^A-Za-z0-9._-]", "_", filename)
+            self.send_response(200)
+            self.send_header("content-type", ctype + "; charset=utf-8")
+            self.send_header("content-length", str(len(body)))
+            self.send_header("content-disposition", f'attachment; filename="{safe}"')
+            self.send_header("cache-control", "no-store")
+            self.send_header("x-content-type-options", "nosniff")
+            self.send_header("content-security-policy", "default-src 'none'; sandbox")
+            self.end_headers()
+            self.wfile.write(body)
+
         def _json(self, obj, code: int = 200) -> None:
             self._send(code, json.dumps(redact_obj(obj), default=str).encode("utf-8"), "application/json; charset=utf-8")
 
@@ -161,6 +175,13 @@ def make_handler(runs_dir: Path, port: int):
                 if not PROJECT_RE.match(m.group(1)):
                     return self._json({"error": "unknown project"}, 404)
                 return self._json(history.project_history(runs_dir, m.group(1)))
+            m = re.match(r"^/api/runs/([^/]+)/export/([a-z]+)$", path)
+            if m:
+                d = run_dir_for(runs_dir, m.group(1))
+                if d is None or m.group(2) not in FORMATS:
+                    return self._json({"error": "unknown run or format"}, 404)
+                name, ctype, content = export(d, m.group(2), triage.load())
+                return self._download(f"threadscan-{d.name}-{name}", ctype, content.encode("utf-8"))
             m = re.match(r"^/api/runs/([^/]+)(?:/(findings|report|lifecycle|seeds|plan))?$", path)
             if m:
                 d = run_dir_for(runs_dir, m.group(1))

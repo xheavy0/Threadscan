@@ -117,6 +117,25 @@ def cmd_doctor(a) -> int:
     return 1 if report.failed else 0
 
 
+def cmd_export(a) -> int:
+    from threadscan.exporters import FORMATS, export
+    from threadscan.triage import TriageStore
+
+    runs_dir = Path(a.runs_dir)
+    run_dir = Path(a.run) if Path(a.run).is_dir() else runs_dir / a.run
+    if not (run_dir / "findings.json").is_file():
+        print(f"error: {run_dir} is not a finished run (no findings.json)", file=sys.stderr)
+        return 2
+    triage = TriageStore((run_dir.parent if Path(a.run).is_dir() else runs_dir) / "triage.json").load()
+    for fmt in (list(FORMATS) if a.format == "all" else [a.format]):
+        name, _, content = export(run_dir, fmt, triage)
+        out = Path(a.out) / name if a.out else run_dir / name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(content, encoding="utf-8", newline="" if fmt == "csv" else "\n")
+        print(f"{fmt:<6} {out}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="threadscan", description="AI vulnerability scanner with a verification gate")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -151,6 +170,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--runs-dir", default="runs")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_dashboard)
+
+    p = sub.add_parser("export", help="export a run's verified issues: SARIF, CSV, JSON or a self-contained HTML report")
+    p.add_argument("run", help="run directory, or a run id inside --runs-dir")
+    p.add_argument("--format", choices=["sarif", "csv", "json", "html", "all"], default="all")
+    p.add_argument("--out", help="directory to write to (default: the run directory)")
+    p.add_argument("--runs-dir", default="runs")
+    p.set_defaults(fn=cmd_export)
 
     p = sub.add_parser("doctor", help="check this machine is ready to scan; --live runs a cheap end-to-end test")
     p.add_argument("target", type=Path, nargs="?", help="optional target config dir, e.g. targets/aegis")

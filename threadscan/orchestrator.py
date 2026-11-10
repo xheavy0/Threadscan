@@ -21,6 +21,8 @@ from threadscan.report import Dropped, build_summary, finding_dict, write_output
 from threadscan.seeds import Seed, assign_seeds, load_seed_file
 from threadscan.status import StatusTracker, write_json
 from threadscan import history
+from threadscan.exporters import write_exports
+from threadscan.triage import TriageStore
 from threadscan.verify import DROP_REASONS, Executor, Policy, RunResult, Verdict, Verifier, classify_unpatched, new_nonce
 
 PKG_DIR = Path(__file__).resolve().parent
@@ -369,6 +371,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
             results = [_component_result(c, "planned", None, None) for c in comps]
             summary = build_summary(len(comps), results, 0, [], [], len(seeds), seeds_assigned, {}, None)
             write_outputs(run_dir, meta, [], [], summary)
+            write_exports(run_dir)
             status.phase("done", "dry run: plan, tasks and an empty report written")
             return run_dir
 
@@ -502,6 +505,7 @@ def run_scan(cfg: ProjectConfig, opts: ScanOptions, backend: Backend | None = No
         if skipped:
             summary["resume_command"] = resume_command(cfg, opts.mode, base, skipped)
         write_outputs(run_dir, meta, findings, dropped, summary, lifecycle)
+        write_exports(run_dir, TriageStore(opts.runs_dir.resolve() / "triage.json").load())
         status.counts(verified=len(findings), dropped=len(cand_dropped), by_reason={k: v for k, v in by_reason.items() if k != "agent_error"})
         done_msg = f"{len(findings)} verified, {len(cand_dropped)} dropped"
         if skipped:
